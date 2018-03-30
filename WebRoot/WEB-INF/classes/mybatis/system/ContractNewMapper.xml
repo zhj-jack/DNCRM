@@ -1,0 +1,1301 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ContractNewMapper">
+    <!-- 查询全部报价信息 -->
+	<select id="SoContractlistPage" parameterType="page" resultType="pd">
+		SELECT
+		  tb_so_contract.*,
+		  sys_user.`NAME` as USER_NAME
+		FROM
+		  tb_so_contract
+		LEFT JOIN
+		  sys_user
+		ON
+		  tb_so_contract.INPUT_USER=sys_user.USER_ID
+		where 1=1
+		<if test="pd.item_name != null and pd.item_name != ''">
+			and tb_so_contract.item_name LIKE CONCAT(CONCAT('%',#{pd.item_name}),'%')
+		</if>
+		<if test="pd.HT_NO != null and pd.HT_NO != ''">
+			and tb_so_contract.HT_NO LIKE CONCAT(CONCAT('%',#{pd.HT_NO}),'%')
+		</if>
+		<if test="pd.ACT_STATUS != null and pd.ACT_STATUS != ''">
+			and tb_so_contract.ACT_STATUS LIKE CONCAT(CONCAT('%',#{pd.ACT_STATUS}),'%')
+		</if>
+	</select>
+    
+    <!-- 根据合同UUid获取合同信息 -->
+	<select id="findSoConByUUid" parameterType="pd" resultType="pd">
+		select * from tb_so_contract WHERE tb_so_contract.HT_UUID=#{HT_UUID}
+	</select>
+
+
+	<!-- 根据项目id获取项目信息 -->
+	<select id="findItemById" parameterType="pd" resultType="pd">
+		SELECT
+			i.item_id,
+		  i.item_no,
+		  i.item_name,
+		  customer.customer_name,
+		  address.*
+		FROM
+			tb_item AS i
+		LEFT JOIN (
+			SELECT
+				customer_no,
+				customer_name
+			FROM
+				tb_customer_core
+			UNION
+				SELECT
+					customer_no,
+					customer_name
+				FROM
+					tb_customer_merchant
+				UNION
+					SELECT
+						customer_no,
+						customer_name
+					FROM
+						tb_customer_ordinary
+		) AS customer ON i.customer_no = customer.customer_no
+		LEFT JOIN
+		  (
+		    SELECT
+			tb_address.id,
+		  tb_loc_province.name as province_name,
+		  tb_loc_city.name as city_name,
+		  tb_loc_county.name as county_name,
+		  tb_address.address_info
+		FROM
+			tb_address
+		LEFT JOIN
+		  tb_loc_province
+		ON
+		  tb_address.province_id=tb_loc_province.id
+		LEFT JOIN
+		  tb_loc_city
+		ON
+		  tb_address.city_id=tb_loc_city.id
+		LEFT JOIN
+		  tb_loc_county
+		ON
+		  tb_address.county_id=tb_loc_county.id  
+		
+		  ) as address ON i.item_install_address=address.id
+		   where item_id=#{item_id}
+	</select>
+	<!-- 根据项目id获取电梯信息 -->
+	<select id="findBJCByItemId" parameterType="pd" resultType="pd">
+		SELECT
+			*
+		FROM
+			tb_bjc as b
+		LEFT JOIN
+		  tb_models as m
+		ON
+		  b.BJC_MODELS=m.models_id
+		WHERE 
+		  b.BJC_ITEM_ID=#{item_id}
+	</select>
+    
+    <!-- 根据电梯id获取电梯信息 -->
+	<select id="findElevById" parameterType="pd" resultType="pd">
+		SELECT
+			*
+		FROM
+			tb_elevator_details as elev
+		where elev.id in
+		<foreach collection="list"  item="list" index="index" open="(" close=")" separator=",">
+            #{list}
+        </foreach>
+	</select>
+    
+    <!-- 根据项目id获取电梯数量 -->
+	<select id="findElevByItemId" parameterType="pd" resultType="pd">
+		SELECT 
+		COUNT(*) as DTNUM 
+		FROM tb_elevator_details 
+		WHERE item_id=#{item_id}
+	</select>
+
+     <!-- 根据项目id获取报价金额 -->
+	<select id="findOfferByItemId" parameterType="pd" resultType="pd">
+		SELECT 
+		offer_id,
+		total 
+		FROM tb_e_offer 
+		WHERE item_id=#{item_id}
+	</select>
+    
+    <!-- 根据合同id获取 tb_so_dtinfo信息 -->
+	<select id="findDtInfoByHtId" parameterType="pd" resultType="pd">
+		SELECT
+		  *
+		FROM
+		  tb_so_dtinfo
+		WHERE 
+		  DT_HT_ID=#{HT_UUID}
+	</select>
+	
+	<!-- 根据合同id获取 tb_so_fkfs -->
+	<select id="findFkfsByHtId" parameterType="pd" resultType="pd">
+		SELECT
+		  *
+		FROM
+		  tb_so_fkfs
+		WHERE 
+		  FKFS_HT_UUID=#{HT_UUID}
+	</select>
+    
+    <!-- 查询不存在合同表内的报价信息 -->
+	<select id="e_offerlistPage" parameterType="page" resultType="pd">
+	    SELECT
+			*
+		FROM
+			(
+				SELECT
+					eo.offer_id,
+					eo.offer_no,
+					i.item_name,
+					i.item_id,
+					customer.customer_name,
+					elev.num,
+					FORMAT(eo.total, '000,000.00') AS total,
+					u.USERNAME,
+					eo.instance_id,
+					eo.instance_status
+				FROM
+					tb_e_offer AS eo
+				LEFT JOIN tb_item AS i ON eo.item_id = i.item_id
+				LEFT JOIN (
+					SELECT
+						customer_no,
+						customer_name
+					FROM
+						tb_customer_core
+					UNION
+						SELECT
+							customer_no,
+							customer_name
+						FROM
+							tb_customer_merchant
+						UNION
+							SELECT
+								customer_no,
+								customer_name
+							FROM
+								tb_customer_ordinary
+				) AS customer ON i.customer_no = customer.customer_no
+				LEFT JOIN (
+					SELECT
+						*, COUNT(id) AS num
+					FROM
+						tb_elevator_details
+					GROUP BY
+						item_id
+				) AS elev ON eo.item_id = elev.item_id
+				LEFT JOIN sys_user AS u ON eo.offer_user = u.USER_ID
+				where 1=1 
+				<if test="pd.item_name != null and pd.item_name != ''">
+					and i.item_name LIKE CONCAT(CONCAT('%',#{pd.item_name}),'%')
+				</if>
+			) qwe
+		WHERE
+			qwe.offer_id NOT IN (
+				SELECT
+					HT_OFFER_ID
+				FROM
+					tb_so_contract
+			)
+	</select>
+    
+    <!-- 根据HT_UUID 删除tb_so_dtInfo -->
+	<delete id="deleteDtInfo" parameterType="pd">
+		delete from tb_so_dtInfo where DT_HT_ID=#{HT_UUID}
+	</delete>
+	
+	<!-- 根据HT_UUID 删除tb_so_fkfs -->
+	<delete id="deleteFkfs" parameterType="pd">
+		delete from tb_so_fkfs where FKFS_HT_UUID=#{HT_UUID}
+	</delete>
+	
+	<!-- 根据HT_UUID 删除tb_so_contract -->
+	<delete id="deleteContract" parameterType="pd">
+		delete from tb_so_contract where HT_UUID=#{HT_UUID}
+	</delete>
+    
+    
+    <!-- 保存合同信息 -->
+	<insert id="save" parameterType="pd">
+		insert into tb_so_contract
+		(
+			HT_UUID,
+			HT_NO,
+			HT_ITEM_ID,
+			HT_OFFER_ID,
+			HT_QDRQ,
+			HT_MBQX,
+			HT_JHFS,
+			HT_ZBJBL,
+			HT_LXR,
+			HT_LXDH,
+			HT_YJKGRQ,
+			HT_TYPE,
+			HT_FJSC,
+			HT_WJLX,
+			HT_YJSGZQ,
+			HT_YJGHZQ,
+			HT_JHRQ,
+			HT_BZ,
+			ACT_KEY,
+			ACT_STATUS,
+			INPUT_USER,
+			INPUT_TIME,
+			customer_name,
+			item_name,
+			DT_NUM,
+			TOTAL
+		)values(
+			#{HT_UUID},
+			#{HT_NO},
+			#{item_id},
+			#{offer_id},
+			#{HT_QDRQ},
+			#{HT_MBQX},
+			#{HT_JHFS},
+			#{HT_ZBJBL},
+			#{HT_LXR},
+			#{HT_LXDH},
+			#{HT_YJKGRQ},
+			#{HT_TYPE},
+			#{HT_FJSC},
+			#{HT_WJLX},
+			#{HT_YJSGZQ},
+			#{HT_YJGHZQ},
+			#{HT_JHRQ},
+			#{HT_BZ},
+			#{ACT_KEY},
+			#{ACT_STATUS},
+			#{INPUT_USER},
+			#{INPUT_TIME},
+			#{customer_name},
+			#{item_name},
+			#{DTNUM},
+			#{TOTAL}
+		)
+	</insert>
+
+    <!-- 根据HT_UUID 修改合同信息 -->
+	<update id="edit" parameterType="pd">
+	    UPDATE tb_so_contract
+		SET
+		HT_QDRQ        =#{HT_QDRQ},
+		HT_MBQX         =#{HT_MBQX},
+		HT_JHFS         =#{HT_JHFS},
+		HT_ZBJBL        =#{HT_ZBJBL},
+		HT_LXR         =#{HT_LXR},
+		HT_LXDH         =#{HT_LXDH},
+		HT_YJKGRQ        =#{HT_YJKGRQ},
+		HT_TYPE         =#{HT_TYPE},
+		HT_FJSC         =#{HT_FJSC},
+		HT_WJLX          =#{HT_WJLX},
+		HT_YJSGZQ         =#{HT_YJSGZQ},
+		HT_YJGHZQ         =#{HT_YJGHZQ},
+		HT_JHRQ            =#{HT_JHRQ}, 
+		HT_BZ            =#{HT_BZ}  
+		Where
+		HT_UUID = #{HT_UUID}
+	</update>
+
+     <!-- 保存电梯信息 -->
+	<insert id="saveDt" parameterType="pd">
+		insert into tb_so_dtInfo
+		(
+			DT_UUID,
+			DT_NO,
+			DT_TX,
+			DT_TH,
+			DT_CZM,
+			DT_SBDJ,
+			DT_AZDJ,
+			DT_YSJ,
+			DT_XJ,
+			DT_HT_ID
+		)values(
+			#{DT_UUID},
+			#{DT_NO},
+			#{DT_TX},
+			#{DT_TH},
+			#{DT_CZM},
+			#{DT_SBDJ},
+			#{DT_AZDJ},
+			#{DT_YSJ},
+			#{DT_XJ},
+			#{DT_HT_ID}
+		)
+	</insert>
+	
+	 <!-- 保存付款方式 -->
+	<insert id="saveFkfs" parameterType="pd">
+		insert into tb_so_fkfs
+		(
+			FKFS_UUID,
+			FKFS_QS,
+			FKFS_KX,
+			FKFS_PDRQ,
+			FKFS_PCRQ,
+			FKFS_FKBL,
+			FKFS_JE,
+			FKFS_ZT,
+			FKFS_BZ,
+			FKFS_HT_UUID
+		)values(
+			#{FKFS_UUID},
+			#{FKFS_QS},
+			#{FKFS_KX},
+			#{FKFS_PDRQ},
+			#{FKFS_PCRQ},
+			#{FKFS_FKBL},
+			#{FKFS_JE},
+			#{FKFS_ZT},
+			#{FKFS_BZ},
+			#{FKFS_HT_UUID}
+		)
+	</insert>
+	
+	<!-- 飞尚COD输出 -->
+	<select id="printFEISHANG_COD" parameterType="page" resultType="pd">
+		select 
+			FEISHANG_ID,
+			FEISHANG_ZHJ,
+			FEISHANG_SBJ,
+			FEISHANG_ZK,
+			FEISHANG_ZHSBJ,
+			FEISHANG_AZF,
+			FEISHANG_YSF,
+			FEISHANG_SJBJ,
+			FEISHANG_SL,
+			ELEV_IDS,
+			ITEM_ID,
+			MODELS_ID,
+			BZ_ZZ,
+			BZ_SD,
+			BZ_KMXS,
+			BZ_KMKD,
+			BZ_C,
+			BZ_Z,
+			BZ_M,
+			BASE_KZXT,
+			BASE_KZFS,
+			BASE_YYZJ,
+			BASE_JDJG,
+			BASE_QGLJJ,
+			BASE_JXGG,
+			BASE_JXGD,
+			BASE_KMCC,
+			BASE_JXRKSL,
+			BASE_MLXMBH,
+			BASE_JDCZQHD,
+			BASE_JDK,
+			BASE_JDS,
+			BASE_TSGD,
+			BASE_DKSD,
+			BASE_DCGD,
+			BASE_JDZG,
+			BASE_JZZT,
+			BASE_LCBJ,
+			BASE_DGZJ,
+			OPT_SZTJMSJ,
+			OPT_XFLD,
+			OPT_XFYYX,
+			OPT_TWXFYFW,
+			OPT_JXDZZ,
+			OPT_CCTVDL,
+			OPT_TDYJJY,
+			OPT_DJGRBH,
+			OPT_WLW,
+			OPT_SJCZ,
+			OPT_BAJK,
+			OPT_YYBZ,
+			OPT_FDLCZ,
+			OPT_XJX,
+			OPT_JJBYDYCZZZ,
+			OPT_LOPAN,
+			OPT_LOPANGS,
+			OPT_GTJX,
+			OPT_GTCS,
+			DZJKSDJXT_DJTXFS,
+			DZJKSDJXT_DJDDTTS,
+			JXZH_JM,
+			JXZH_JMSBH,
+			JXZH_QWB,
+			JXZH_QWBSBH,
+			JXZH_CWB,
+			JXZH_CWBSBH,
+			JXZH_HWB,
+			JXZH_HWBSBH,
+			JXZH_JDZH,
+			JXZH_BXGDD,
+			JXZH_BXGDB,
+			JXZH_BGJ,
+			JXZH_DBXH,
+			JXZH_DBZXHD,
+			JXZH_FZTXH,
+			JXZH_FZTAZWZ,
+			TMMT_FWBXGTM,
+			TMMT_FWBXGXMT,
+			TMMT_DMT,
+			TMMT_SCTMMT,
+			TMMT_SCSBH,
+			TMMT_SCSL,
+			TMMT_FSCTMMT,
+			TMMT_FSCSBH,
+			TMMT_FSCSL,
+			CZP_CZPLX,
+			CZP_CZPXH,
+			CZP_XS,
+			CZP_AN,
+			CZP_CZ,
+			CZP_CZPWZ,
+			TMXHZZ_TWZHLX,
+			TMXHZZ_TWZHXH,
+			TMXHZZ_XS,
+			TMXHZZ_AN,
+			TMXHZZ_CZ,
+			TMXHZZ_TWZHXS,
+			TMXHZZ_ZDJC,
+			TMXHZZ_MCGS,
+			TMXHZZ_FJSM
+		from
+				tb_feishang
+		where 1=1
+		<!-- <if test="pd.search_item_name != null and pd.search_item_name != ''">
+            and item_name LIKE CONCAT(CONCAT('%', #{pd.search_item_name}),'%')
+        </if>
+        <if test="pd.userList!=null and pd.userList.size()>0">
+			and input_user in
+			<foreach collection="pd.userList"  item="user_id" index="index" open="(" close=")" separator=",">
+	            ${user_id}
+	        </foreach>
+        </if>
+        order by
+        	input_date
+        desc -->
+			
+	</select>
+	
+	<!-- 飞逸COD输出 -->
+	<select id="printSHINY_COD" parameterType="page" resultType="pd">
+		select 
+			SHINY_ID,
+			SHINY_AZF,
+			SHINY_YSF,
+			SHINY_SL,
+			SHINY_ZK,
+			SHINY_ZHJ,
+			SHINY_SBJ,
+			SHINY_ZHSBJ,
+			SHINY_SJBJ,
+			ELEV_IDS,
+			ITEM_ID,
+			BZ_ZZ,
+			BZ_SD,
+			BZ_KMXS,
+			BZ_KMKD,
+			BZ_C,
+			BZ_Z,
+			BZ_M,
+			BASE_KZXT,
+			BASE_KZFS,
+			BASE_YYZJ,
+			BASE_QGLJJ,
+			BASE_JXGG,
+			BASE_JXGD,
+			BASE_HTDM,
+			BASE_MJXH,
+			BASE_MBHFS,
+			BASE_JDJG,
+			BASE_JDCZQHD,
+			BASE_JDK,
+			BASE_JDS,
+			BASE_TSGD,
+			BASE_DKSD,
+			BASE_DCGD,
+			BASE_JDZG,
+			BASE_JZZT,
+			BASE_LCBJ,
+			BASE_DGZJ,
+			OPT_JFGT,
+			OPT_COP,
+			OPT_WZYCOPMWAN,
+			OPT_GBSCJRCZXCOP,
+			OPT_LOP,
+			OPT_FDLCZ,
+			OPT_TDJJJY,
+			OPT_YSJCZ,
+			OPT_CCTVDL,
+			OPT_JJBYDYCZZZ,
+			OPT_JXDZZ,
+			OPT_ZPC,
+			OPT_YCJSJKZB,
+			OPT_YYBZ,
+			OPT_HJZDFHJZ,
+			OPT_BAJK,
+			OPT_DJGRBH,
+			OPT_XFLD,
+			OPT_TWXFYFW,
+			DZJKSDJXT_DJTXFS,
+			DZJKSDJXT_TQZDSBH,
+			JXZH_JM,
+			JXZH_JMSBH,
+			JXZH_QWB,
+			JXZH_QWBSBH,
+			JXZH_CWB,
+			JXZH_CWBSBH,
+			JXZH_HWB,
+			JXZH_HWBSBH,
+			JXZH_JDZH,
+			JXZH_JDAQC,
+			JXZH_DBXH,
+			JXZH_DBZXHD,
+			JXZH_FZTXH,
+			JXZH_FZTAZWZ,
+			JXZH_BGJ,
+			TMMT_SCTMMTCZXMK,
+			TMMT_FSCTMMTCZXMK,
+			TMMT_XMKCZS,
+			TMMT_XMKLM,
+			TMMT_SCTMMTCZDMK,
+			TMMT_FSCTMMTCZDMK,
+			TMMT_DMKCZS,
+			TMMT_DMKLM,
+			TMMT_TMCZ,
+			TMMT_FSCTMCZ,
+			TMMT_CZS,
+			TMMT_LM,
+			CZP_CZPLX,
+			CZP_CZPXH,
+			CZP_XS,
+			CZP_AN,
+			CZP_CZ,
+			CZP_CZPWZ,
+			TMXHZZ_TWZHLX,
+			TMXHZZ_TWZHXH,
+			TMXHZZ_SL,
+			TMXHZZ_XS,
+			TMXHZZ_AN,
+			TMXHZZ_CZ,
+			TMXHZZ_TWZHXS,
+			TMXHZZ_ZDJC,
+			TMXHZZ_FJSM,
+			UNSTD
+		from
+			tb_shiny
+		where 1=1
+	</select>
+	
+	<!-- 新飞越COD输出 -->
+	<select id="printFEIYUE_COD" parameterType="page" resultType="pd">
+		select 
+			FEIYUE_ID,
+			FEIYUE_AZF,
+			FEIYUE_YSF,
+			FEIYUE_SL,
+			FEIYUE_ZK,
+			FEIYUE_ZHJ,
+			FEIYUE_SBJ,
+			FEIYUE_ZHSBJ,
+			FEIYUE_SJBJ,
+			ELEV_IDS,
+			ITEM_ID,
+			MODLES_ID,
+			BZ_ZZ,
+			BZ_SD,
+			BZ_KMXS,
+			BZ_KMKD,
+			BZ_C,
+			BZ_Z,
+			BZ_M,
+			BASE_KZXT,
+			BASE_KZFS,
+			BASE_HTDM,
+			BASE_JDJG,
+			BASE_QGLJJ,
+			BASE_JXGG,
+			BASE_JXGD,
+			BASE_MLXMBH,
+			BASE_JDCZQHD,
+			BASE_JDK,
+			BASE_JDS,
+			BASE_TSGD,
+			BASE_DKSD,
+			BASE_DCGD,
+			BASE_JDZG,
+			BASE_JZZT,
+			BASE_LCBJ,
+			BASE_DGZJ,
+			OPT_LTBL,
+			OPT_TDJJJY,
+			OPT_JXDZZ,
+			OPT_SJCZ,
+			OPT_CCTVDL,
+			OPT_DJGRBH,
+			OPT_BAJK,
+			OPT_MBCAN,
+			OPT_KMZPC,
+			OPT_QPGM,
+			OPT_YCJK,
+			OPT_JFGT,
+			OPT_ICK,
+			OPT_ICKZKSB,
+			OPT_ICKKP,
+			OPT_GTMJXJMBF,
+			OPT_GTMTMBF,
+			OPT_GTMS,
+			DZJKSDJXT_DJTXFS,
+			DZJKSDJXT_DJTS,
+			JXZH_JM,
+			JXZH_JMSBH,
+			JXZH_JMZH,
+			JXZH_JXZH,
+			JXZH_QWB,
+			JXZH_QWBSBH,
+			JXZH_CWB,
+			JXZH_CWBSBH,
+			JXZH_HWB,
+			JXZH_HWBSBH,
+			JXZH_JDZH,
+			JXZH_ZSDD,
+			JXZH_AQC,
+			JXZH_BGJ,
+			JXZH_DBXH,
+			JXZH_DBZXHD,
+			JXZH_YLZHZL,
+			JXZH_FSXH,
+			JXZH_FSAZWZ,
+			TMMT_SCMK,
+			TMMT_SCMKCZ,
+			TMMT_SCMKGBSBH,
+			TMMT_QYCMK,
+			TMMT_QYCMKCZ,
+			TMMT_QYCMKGBSBH,
+			TMMT_SCTMCZ,
+			TMMT_SCTMGBSBH,
+			TMMT_QYCTMCZ,
+			TMMT_QYCTMGBSBH,
+			CZP_CZPLX,
+			CZP_CZPXH,
+			CZP_XS,
+			CZP_AN,
+			CZP_CZ,
+			CZP_CZPWZ,
+			TMXHZZ_TWZHLX,
+			TMXHZZ_TWZHXH,
+			TMXHZZ_XS,
+			TMXHZZ_AN,
+			TMXHZZ_CZ,
+			TMXHZZ_ZDJC,
+			TMXHZZ_MCGS,
+			TMXHZZ_FJSM,
+			TMXHZZ_GBSCJRCZX,
+			UNSTD
+		from
+			tb_feiyue
+		where 1=1
+	</select>
+	
+	<!-- 飞扬3000+无机房COD输出 -->
+	<select id="printFEIYANG_MRL_COD" parameterType="page" resultType="pd">
+		select 
+			FEIYANGMRL_ID,
+			FEIYANGMRL_AZF,
+			FEIYANGMRL_YSF,
+			FEIYANGMRL_SL,
+			FEIYANGMRL_ZK,
+			FEIYANGMRL_ZHJ,
+			FEIYANGMRL_SBJ,
+			FEIYANGMRL_ZHSBJ,
+			FEIYANGMRL_SJBJ,
+			ELEV_IDS,
+			ITEM_ID,
+			MODLES_ID,
+			BZ_ZZ,
+			BZ_SD,
+			BZ_KMXS,
+			BZ_KMKD,
+			BZ_C,
+			BZ_Z,
+			BZ_M,
+			BASE_KZXT,
+			BASE_KZFS,
+			BASE_JDJG,
+			BASE_QGLJJ,
+			BASE_JXGG,
+			BASE_JXGD,
+			BASE_KMCC,
+			BASE_MLXMBH,
+			BASE_JDCZQHD,
+			BASE_JDK,
+			BASE_JDS,
+			BASE_TSGD,
+			BASE_DKSD,
+			BASE_DCGD,
+			BASE_JDZG,
+			BASE_JZZT,
+			BASE_LCBJ,
+			BASE_DGZJ,
+			OPT_MWAN,
+			OPT_HJZDFHJZ,
+			OPT_XFYYX,
+			OPT_JXDZZ,
+			OPT_CCTVDL,
+			OPT_TDJJJY,
+			OPT_DJGRBH,
+			OPT_KQJHZZ,
+			OPT_NMYKJAN,
+			OPT_FDLCZ,
+			OPT_ZPC,
+			OPT_BAJK,
+			OPT_YYBZ,
+			OPT_QPGM,
+			OPT_DLFW,
+			OPT_KMBC,
+			OPT_DZYX,
+			OPT_NLHK,
+			OPT_YCJK,
+			OPT_ICK,
+			OPT_ICKZKSB,
+			OPT_ICKKP,
+			OPT_PTDTKT,
+			OPT_ZYFTSDTKT,
+			OPT_JKGM,
+			OPT_JKYYJ,
+			OPT_GTMJXJMBF,
+			OPT_GTMTMBF,
+			OPT_GTMS,
+			OPT_CMZH,
+			OPT_JFGT,
+			OPT_DJT,
+			DZJKSDJXT_DJTXFS,
+			DZJKSDJXT_DJTS,
+			JXZH_JM,
+			JXZH_JMSBH,
+			JXZH_JMZH,
+			JXZH_JXZH,
+			JXZH_QWB,
+			JXZH_QWBSBH,
+			JXZH_CWB,
+			JXZH_CWBSBH,
+			JXZH_HWB,
+			JXZH_HWBSBH,
+			JXZH_JDZH,
+			JXZH_ZSDD,
+			JXZH_AQC,
+			JXZH_BGJ,
+			JXZH_DBXH,
+			JXZH_DBZXHD,
+			JXZH_YLZHZL,
+			JXZH_FSXH,
+			JXZH_FSAZWZ,
+			TMMT_FWBXGXMT,
+			TMMT_PTDMT,
+			TMMT_PTJMBXGTM,
+			TMMT_SCTMMT,
+			TMMT_SCSBH,
+			TMMT_FSCTMMT,
+			TMMT_FSCSBH,
+			TMXHZZ_TWZHLX,
+			TMXHZZ_TWZHXH,
+			TMXHZZ_XS,
+			TMXHZZ_AN,
+			TMXHZZ_CZ,
+			TMXHZZ_ZDJC,
+			TMXHZZ_MCGS,
+			TMXHZZ_FJSM,
+			TMXHZZ_WZYCOPMWAN,
+			CZP_CZPLX,
+			CZP_CZPXH,
+			CZP_XS,
+			CZP_AN,
+			CZP_CZ,
+			CZP_CZPWZ,
+			CZP_XS_SUB,
+			UNSTD
+		from
+			tb_feiyang_mrl
+		where 1=1
+	</select>
+	
+	<!-- 飞扬3000小机房COD输出 -->
+	<select id="printFEIYANG_COD" parameterType="page" resultType="pd">
+		select 
+			FEIYANG_ID,
+			FEIYANG_AZF,
+			FEIYANG_YSF,
+			FEIYANG_SL,
+			FEIYANG_ZK,
+			FEIYANG_ZHJ,
+			FEIYANG_SBJ,
+			FEIYANG_ZHSBJ,
+			FEIYANG_SJBJ,
+			ELEV_IDS,
+			ITEM_ID,
+			MODLES_ID,
+			BZ_ZZ,
+			BZ_SD,
+			BZ_KMXS,
+			BZ_KMKD,
+			BZ_C,
+			BZ_Z,
+			BZ_M,
+			BASE_KZXT,
+			BASE_KZFS,
+			BASE_JDJG,
+			BASE_QGLJJ,
+			BASE_JXGG,
+			BASE_JXGD,
+			BASE_KMCC,
+			BASE_MLXMBH,
+			BASE_JDCZQHD,
+			BASE_JDK,
+			BASE_JDS,
+			BASE_TSGD,
+			BASE_DKSD,
+			BASE_DCGD,
+			BASE_JDZG,
+			BASE_JZZT,
+			BASE_LCBJ,
+			BASE_DGZJ,
+			OPT_MWAN,
+			OPT_HJZDFHJZ,
+			OPT_XFYYX,
+			OPT_JXDZZ,
+			OPT_CCTVDL,
+			OPT_TDJJJY,
+			OPT_DJGRBH,
+			OPT_KQJHZZ,
+			OPT_NMYKJAN,
+			OPT_FDLCZ,
+			OPT_ZPC,
+			OPT_BAJK,
+			OPT_YYBZ,
+			OPT_QPGM,
+			OPT_DLFW,
+			OPT_KMBC,
+			OPT_DZYX,
+			OPT_NLHK,
+			OPT_YCJK,
+			OPT_ICK,
+			OPT_ICKZKSB,
+			OPT_ICKKP,
+			OPT_PTDTKT,
+			OPT_ZYFTSDTKT,
+			OPT_JKGM,
+			OPT_JKYYJ,
+			OPT_GTMJXJMBF,
+			OPT_GTMTMBF,
+			OPT_GTMS,
+			OPT_CMZH,
+			OPT_JFGT,
+			OPT_DJT,
+			DZJKSDJXT_DJTXFS,
+			DZJKSDJXT_DJTS,
+			JXZH_JM,
+			JXZH_JMSBH,
+			JXZH_JMZH,
+			JXZH_JXZH,
+			JXZH_QWB,
+			JXZH_QWBSBH,
+			JXZH_CWB,
+			JXZH_CWBSBH,
+			JXZH_HWB,
+			JXZH_HWBSBH,
+			JXZH_JDZH,
+			JXZH_ZSDD,
+			JXZH_AQC,
+			JXZH_BGJ,
+			JXZH_DBXH,
+			JXZH_DBZXHD,
+			JXZH_YLZHZL,
+			JXZH_FSXH,
+			JXZH_FSAZWZ,
+			TMMT_FWBXGXMT,
+			TMMT_PTDMT,
+			TMMT_PTJMBXGTM,
+			TMMT_SCTMMT,
+			TMMT_SCSBH,
+			TMMT_FSCTMMT,
+			TMMT_FSCSBH,
+			TMXHZZ_TWZHLX,
+			TMXHZZ_TWZHXH,
+			TMXHZZ_XS,
+			TMXHZZ_AN,
+			TMXHZZ_CZ,
+			TMXHZZ_ZDJC,
+			TMXHZZ_MCGS,
+			TMXHZZ_FJSM,
+			TMXHZZ_WZYCOPMWAN,
+			CZP_CZPLX,
+			CZP_CZPXH,
+			CZP_XS,
+			CZP_AN,
+			CZP_CZ,
+			CZP_CZPWZ,
+			CZP_XS_SUB,
+			UNSTD
+		from
+			tb_feiyang
+		where 1=1
+	</select>
+	
+	<!-- 飞扬消防梯COD输出 -->
+	<select id="printFEIYANGXF_COD" parameterType="page" resultType="pd">
+		select 
+			FEIYANGXF_ID,
+			FEIYANGXF_AZF,
+			FEIYANGXF_YSF,
+			FEIYANGXF_SL,
+			FEIYANGXF_ZK,
+			FEIYANGXF_ZHJ,
+			FEIYANGXF_SBJ,
+			FEIYANGXF_ZHSBJ,
+			FEIYANGXF_SJBJ,
+			ELEV_IDS,
+			ITEM_ID,
+			MODLES_ID,
+			BZ_ZZ,
+			BZ_SD,
+			BZ_KMXS,
+			BZ_KMKD,
+			BZ_C,
+			BZ_Z,
+			BZ_M,
+			BASE_KZXT,
+			BASE_KZFS,
+			BASE_JDJG,
+			BASE_QGLJJ,
+			BASE_JXGG,
+			BASE_JXGD,
+			BASE_KMCC,
+			BASE_MLXMBH,
+			BASE_JDCZQHD,
+			BASE_JDK,
+			BASE_JDS,
+			BASE_TSGD,
+			BASE_DKSD,
+			BASE_DCGD,
+			BASE_JDZG,
+			BASE_JZZT,
+			BASE_LCBJ,
+			BASE_DGZJ,
+			OPT_MWAN,
+			OPT_JXDZZ,
+			OPT_CCTVDL,
+			OPT_TDJJJY,
+			OPT_DJGRBH,
+			OPT_KQJHZZ,
+			OPT_NMYKJAN,
+			OPT_FDLCZ,
+			OPT_ZPC,
+			OPT_BAJK,
+			OPT_YYBZ,
+			OPT_QPGM,
+			OPT_DLFW,
+			OPT_KMBC,
+			OPT_DZYX,
+			OPT_NLHK,
+			OPT_YCJK,
+			OPT_ICK,
+			OPT_ICKZKSB,
+			OPT_ICKKP,
+			OPT_PTDTKT,
+			OPT_ZYFTSDTKT,
+			OPT_JKGM,
+			OPT_JKYYJ,
+			OPT_GTMJXJMBF,
+			OPT_GTMTMBF,
+			OPT_GTMS,
+			OPT_CMZH,
+			DZJKSDJXT_DJTXFS,
+			DZJKSDJXT_DJTS,
+			JXZH_JM,
+			JXZH_JMSBH,
+			JXZH_JMZH,
+			JXZH_JXZH,
+			JXZH_QWB,
+			JXZH_QWBSBH,
+			JXZH_CWB,
+			JXZH_CWBSBH,
+			JXZH_HWB,
+			JXZH_HWBSBH,
+			JXZH_JDZH,
+			JXZH_ZSDD,
+			JXZH_BGJ,
+			JXZH_DBXH,
+			JXZH_DBZXHD,
+			JXZH_YLZHZL,
+			JXZH_FSXH,
+			JXZH_FSAZWZ,
+			TMMT_JZBXGXMT,
+			TMMT_PTDMT,
+			TMMT_PTJMBXGTM,
+			TMMT_SCTMMT,
+			TMMT_SCSBH,
+			TMMT_FSCTMMT,
+			TMMT_FSCSBH,
+			TMXHZZ_TWZHLX,
+			TMXHZZ_TWZHXH,
+			TMXHZZ_XS,
+			TMXHZZ_AN,
+			TMXHZZ_CZ,
+			TMXHZZ_ZDJC,
+			TMXHZZ_MCGS,
+			TMXHZZ_FJSM,
+			TMXHZZ_WZYCOPMWAN,
+			CZP_CZPLX,
+			CZP_CZPXH,
+			CZP_XS,
+			CZP_AN,
+			CZP_CZ,
+			CZP_CZPWZ,
+			CZP_XS_SUB,
+			UNSTD
+		from
+			tb_feiyang_xf
+		where 1=1
+	</select>
+	
+	<!-- 扶梯COD输出 -->
+	<select id="printDNP9300_COD" parameterType="page" resultType="pd">
+		select 
+			DNP9300_ID,
+			DNP9300_AZF,
+			DNP9300_YSF,
+			DNP9300_SL,
+			DNP9300_ZK,
+			DNP9300_ZHJ,
+			DNP9300_SBJ,
+			DNP9300_ZHSBJ,
+			DNP9300_SJBJ,
+			ELEV_IDS,
+			ITEM_ID,
+			MODLES_ID,
+			BZ_SD,
+			BZ_GG,
+			BZ_TSGD,
+			BZ_TJKD,
+			BZ_TBKD,
+			BZ_QXJD,
+			BZ_SPTJ,
+			BASE_SPKJ,
+			BASE_DY,
+			BASE_AZHJ,
+			BASE_FSLX,
+			BASE_FSGD,
+			BASE_ZJZCSL,
+			BASE_BZXS,
+			BASE_SDJC,
+			BASE_XDJC,
+			BASE_YSFS,
+			BASE_JHXT,
+			PART_JSJ,
+			PART_TJLX,
+			PART_TJYS,
+			PART_TJZFX,
+			PART_TJBKCZ,
+			PART_FSDGCZ,
+			PART_FSDGG,
+			PART_FSDYS,
+			PART_WQBCZ,
+			PART_NWGBCZ,
+			PART_SCTBJHDGB,
+			PART_SCB,
+			PART_QDFS,
+			OPT_ANZDQ,
+			OPT_JTLXD,
+			OPT_ZDJY,
+			OPT_QDLLZ,
+			OPT_LEDWQZM,
+			OPT_TJFTBH,
+			OPT_FSDDDBHZZ,
+			OPT_ZDWQJXKG,
+			OPT_SCZM,
+			OPT_YSFLQ,
+			OPT_FHBH,
+			OPT_TJLFHZ,
+			OPT_WXHLTS,
+			OPT_FPZZ,
+			OPT_HJFDDS,
+			OPT_GCD,
+			OPT_ZDQMSJK,
+			OPT_DZGSS,
+			OPT_HJJR,
+			OPT_SCJR,
+			OPT_FSJR,
+			OPT_WZSWZ,
+			OPT_ZSBCL,
+			OPT_ZSBHD
+		from
+			tb_dnp9300
+		where 1=1
+	</select>
+    
+    <!-- 人行道COD输出 -->
+    <select id="printDNR_COD" parameterType="page" resultType="pd">
+		select 
+			DNR_ID,
+			DNR_AZF,
+			DNR_YSF,
+			DNR_SL,
+			DNR_ZK,
+			DNR_ZHJ,
+			DNR_SBJ,
+			DNR_ZHSBJ,
+			DNR_SJBJ,
+			ELEV_IDS,
+			ITEM_ID,
+			MODLES_ID,
+			BZ_SD,
+			BZ_GG,
+			BZ_TSGD,
+			BZ_TJKD,
+			BZ_TBKD,
+			BZ_QXJD,
+			BZ_SPTJ,
+			BASE_SPKJ,
+			BASE_DY,
+			BASE_AZHJ,
+			BASE_FSLX,
+			BASE_FSGD,
+			BASE_ZJZCSL,
+			BASE_BZXS,
+			BASE_SDJC,
+			BASE_YSFS,
+			BASE_JHXT,
+			PART_JSJ,
+			PART_TJLX,
+			PART_TJYS,
+			PART_FSDGCZ,
+			PART_FSDGG,
+			PART_FSDYS,
+			PART_WQBCZ,
+			PART_NWGBCZ,
+			PART_SCTBJHDGB,
+			PART_SCB,
+			PART_QDFS,
+			PART_BPGNGL,
+			OPT_ANZDQ,
+			OPT_JTLXD,
+			OPT_ZDJY,
+			OPT_WQAQZZ,
+			OPT_FSDDDBHZZ,
+			OPT_ZDWQJXKG,
+			OPT_SCZM,
+			OPT_WXHLTS,
+			OPT_JXSB,
+			OPT_JXXD,
+			OPT_FPZZ,
+			OPT_HJFDDS,
+			OPT_CKXRXD,
+			OPT_SPMS,
+			OPT_YXFXZSD,
+			OPT_GCD,
+			OPT_QDLLZ,
+			OPT_ZDQMSJK,
+			OPT_LEDWQZM,
+			OPT_DLFDLJQ,
+			OPT_DZGSS,
+			OPT_FZDK,
+			OPT_ZJJT,
+			OPT_EWJT,
+			OPT_WZSWZ,
+			OPT_ZSBCL,
+			OPT_ZSBHD
+		from
+			tb_dnr
+		where 1=1
+	</select>
+    
+    <!-- 获取电梯类型 -->
+    <select id="getElevatorType" parameterType="page" resultType="pd">
+		select 
+			item_name
+		from
+			tb_item
+		where 1=1 limit 1
+	</select>
+	
+	    <!-- 查询流程是否存在 -->
+    <select id="SelAct_Key" parameterType="pd" resultType="pd">
+        SELECT
+          *
+        FROM
+          act_re_procdef
+        WHERE
+          KEY_ = #{KEY}
+    </select>
+    
+    <!-- 修改流程Key -->
+    <update id="editAct_Key" parameterType="pd">
+        UPDATE tb_so_contract
+        SET
+        ACT_KEY    =#{ACT_KEY}
+        Where
+        HT_UUID = #{HT_UUID}
+    </update>
+    
+    <!-- 修改流程状态 -->
+    <update id="editAct_Status" parameterType="pd">
+        UPDATE tb_so_contract
+        SET
+        ACT_STATUS    =#{ACT_STATUS}
+        Where
+        HT_UUID = #{HT_UUID}
+    </update>
+    
+    <!-- 根据报价编号获取信息 -->
+	<select id="findOfferById" parameterType="pd" resultType="pd">
+	   SELECT
+		  eo.*,
+		  i.*,
+		customer.customer_name
+		FROM
+			tb_e_offer as eo
+		LEFT JOIN
+		  tb_item as i
+		ON
+		  eo.item_id=i.item_id
+		LEFT JOIN (
+				 SELECT
+				   customer_no,
+				   customer_name
+				 FROM
+				  tb_customer_core
+				 UNION
+				 SELECT
+				   customer_no,
+				   customer_name
+				 FROM
+				   tb_customer_merchant
+				 UNION
+				 SELECT
+				   customer_no,
+				   customer_name
+				 FROM
+				   tb_customer_ordinary
+			   ) AS customer ON i.customer_no = customer.customer_no
+		WHERE
+			offer_id = #{offer_id}
+	</select>
+    
+    <!-- 设备合同输出 -->
+    <select id="printContractDevice" parameterType="page" resultType="pd">
+		select 
+			*
+		from
+			tb_so_contract
+		where 1=1 limit 1
+	</select>
+</mapper>

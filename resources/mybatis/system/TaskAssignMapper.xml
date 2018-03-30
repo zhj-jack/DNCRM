@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="TaskAssignMapper">
+
+    <select id="getTaskAssignByKey" resultType="pd" parameterType="pd">
+        SELECT a.id,a.task_def_key,a.group_id,a.process_definition_id,r.ROLE_NAME AS group_name FROM
+        wf_task_assign AS a JOIN sys_role as r ON a.group_id = r.ROLE_ID WHERE a.task_def_key = #{task_def_key} AND a.process_definition_id = #{process_definition_id}
+    </select>
+    <select id="getUserInfoByGroupId" resultType="pd" parameterType="pd">
+        SELECT r.ROLE_ID AS group_id,r.ROLE_NAME AS group_name,u.USER_ID AS user_id,u.USERNAME AS user_name,u.NAME AS name,u.EMAIL AS  email,u.PASSWORD AS password FROM sys_role AS  r
+              JOIN sys_user AS u ON r.ROLE_ID = u.ROLE_ID WHERE u.ROLE_ID = #{group_id}
+    </select>
+    <!-- 新增一条记录，插入成功后返回主键 暂时未实现-->
+    <insert id="insertPosition" parameterType="pd" useGeneratedKeys="true" keyProperty="id">
+        <selectKey keyProperty="id" order="AFTER" resultType="java.lang.Integer">
+            select LAST_INSERT_ID()
+        </selectKey>
+		insert into tb_position
+		(    id,
+		     parentId,
+		     name,
+		     orderNo,
+             is_manager,
+             create_time
+		)values(
+             #{id},
+			 #{parentId},
+		     #{name},
+		     #{orderNo},
+             #{is_manager},
+             now()
+		)
+
+	</insert>
+    <update id="updatePosition" parameterType="pd">
+		UPDATE tb_position 
+		   SET
+		   name =#{name},
+		   orderNo =#{orderNo},
+		   is_manager=#{is_manager}
+	     WHERE id =#{id}
+	</update>
+
+    <delete id="deletePosition">
+		DELETE FROM tb_position 
+			  WHERE id = #{id}
+	</delete>
+
+	<select id="getTaskAssignByRole" resultType="pd" parameterType="pd">
+		SELECT r.ROLE_ID AS id ,r.ROLE_NAME AS name ,r.PARENT_ID AS pId,(IF(a.id IS NOT NULL,true,false)) AS checked,(IF(a.id IS NOT NULL,a.id,"")) AS aId
+		FROM sys_role AS r Left JOIN wf_task_assign  AS a ON r.ROLE_ID = a.group_id
+		AND a.task_def_key =#{activityId} AND a.process_definition_id = #{pdid}
+	</select>
+    <!-- 新增一条记录-->
+    <insert id="save" parameterType="pd" >
+
+        insert into wf_task_assign
+        (
+        id,
+        task_def_key,
+        group_id,
+        process_definition_id
+        )values(
+        #{id},
+        #{task_def_key},
+        #{group_id},
+        #{process_definition_id}
+        )
+    </insert>
+    <!--  删除合作商-->
+    <delete id="delete" parameterType="pd">
+        delete from
+            wf_task_assign
+        where
+            id = #{id}
+    </delete>
+</mapper>

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ReportMapper">
+	
+	<select id="customerYearNum" resultType="pd">
+		select date,
+			max(case type when 'Core' then num else 0 end) as coreNum,
+			max(case type when 'Merchant' then num else 0 end) as merchantNum,
+			max(case type when 'Ordinary' then num else 0 end) as ordinaryNum
+		from (
+		select customer_type as type,count(*) as num,input_date as date from (
+		select customer_id,customer_no,customer_type,year(input_date)as input_date from tb_customer_ordinary 
+		union select customer_id,customer_no,customer_type,year(input_date)as input_date from tb_customer_merchant 
+		union select customer_id,customer_no,customer_type,year(input_date)as input_date from tb_customer_core
+		)a group by type,date
+		)b group by date
+	</select>
+	
+	<select id="customerMonthNum"  parameterType="String" resultType="pd">
+		<!-- select date,
+			max(case type when 'Core' then num else 0 end) as coreNum,
+			max(case type when 'Merchant' then num else 0 end) as merchantNum,
+			max(case type when 'Ordinary' then num else 0 end) as ordinaryNum
+		from (
+		select customer_type as type,count(*) as num,input_date as date from (
+		select customer_id,customer_no,customer_type,month(input_date)as input_date from tb_customer_ordinary where year(input_date)=#{year}
+		union select customer_id,customer_no,customer_type,month(input_date)as input_date from tb_customer_merchant where year(input_date)=#{year}
+		union select customer_id,customer_no,customer_type,month(input_date)as input_date from tb_customer_core where year(input_date)=#{year}
+		)a group by type,date
+		)b group by date -->
+		
+		select ds.val as date,IFNULL(c.coreNum,0) as coreNum,IFNULL(c.merchantNum,0) as merchantNum,IFNULL(c.ordinaryNum,0) as ordinaryNum from tb_date_std ds 
+		left join
+		(
+		select date,
+			max(case type when 'Core' then num else 0 end) as coreNum,
+			max(case type when 'Merchant' then num else 0 end) as merchantNum,
+			max(case type when 'Ordinary' then num else 0 end) as ordinaryNum
+		from (
+		select customer_type as type,count(*) as num,input_date as date from (
+		select customer_id,customer_no,customer_type,month(input_date)as input_date from tb_customer_ordinary where year(input_date)=#{year}
+		union select customer_id,customer_no,customer_type,month(input_date)as input_date from tb_customer_merchant where year(input_date)=#{year}
+		union select customer_id,customer_no,customer_type,month(input_date)as input_date from tb_customer_core where year(input_date)=#{year}
+		)a group by type,date
+		)b group by date
+		)c on c.date=ds.val where ds.type='month'
+	</select>
+	
+	<select id="customerQuarterNum"  parameterType="String" resultType="pd">
+		select date,
+			max(case type when 'Core' then num else 0 end) as coreNum,
+			max(case type when 'Merchant' then num else 0 end) as merchantNum,
+			max(case type when 'Ordinary' then num else 0 end) as ordinaryNum
+		from (
+		select customer_type as type,count(*) as num,input_date as date from (
+		select customer_id,customer_no,customer_type,quarter(input_date)as input_date from tb_customer_ordinary where year(input_date)=#{year}
+		union select customer_id,customer_no,customer_type,quarter(input_date)as input_date from tb_customer_merchant where year(input_date)=#{year}
+		union select customer_id,customer_no,customer_type,quarter(input_date)as input_date from tb_customer_core where year(input_date)=#{year}
+		)a group by type,date
+		)b group by date
+	</select>
+	
+	
+</mapper>

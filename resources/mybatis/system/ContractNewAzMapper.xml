@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ContractNewAzMapper">
+    <!-- 查询全部设备 合同 信息 -->
+	<select id="SoContractlistPage" parameterType="page" resultType="pd">
+		SELECT
+		  tb_so_contract.*,
+		  sys_user.`NAME` as USER_NAME
+		FROM
+		  tb_so_contract
+		LEFT JOIN
+		  sys_user
+		ON
+		  tb_so_contract.INPUT_USER=sys_user.USER_ID
+		where tb_so_contract.HT_TYPE=1
+		<if test="pd.item_name != null and pd.item_name != ''">
+			and tb_so_contract.item_name LIKE CONCAT(CONCAT('%',#{pd.item_name}),'%')
+		</if>
+		<if test="pd.HT_NO != null and pd.HT_NO != ''">
+			and tb_so_contract.HT_NO LIKE CONCAT(CONCAT('%',#{pd.HT_NO}),'%')
+		</if>
+	</select>
+	
+	<!-- 查询全部安装合同 信息 -->
+	<select id="AzContractlistPage" parameterType="page" resultType="pd">
+		SELECT
+		  tb_az_contract.*,
+		  sys_user.`NAME` as USER_NAME
+		FROM
+		  tb_az_contract
+		LEFT JOIN
+		  sys_user
+		ON
+		  tb_az_contract.INPUT_USER=sys_user.USER_ID
+		where 1=1
+		<if test="pd.item_name != null and pd.item_name != ''">
+			and tb_az_contract.item_name LIKE CONCAT(CONCAT('%',#{pd.item_name}),'%')
+		</if>
+		<if test="pd.AZ_NO != null and pd.AZ_NO != ''">
+			and tb_az_contract.AZ_NO LIKE CONCAT(CONCAT('%',#{pd.AZ_NO}),'%')
+		</if>
+		<if test="pd.ACT_STATUS != null and pd.ACT_STATUS != ''">
+			and tb_az_contract.ACT_STATUS LIKE CONCAT(CONCAT('%',#{pd.ACT_STATUS}),'%')
+		</if>
+	</select>
+	
+    <!-- 根据 安装 合同 UUid获取 合同信息 -->
+	<select id="findAzConByUUid" parameterType="pd" resultType="pd">
+		select * from tb_az_contract WHERE tb_az_contract.AZ_UUID=#{AZ_UUID}
+	</select>
+
+	<!-- 根据合同id获取 tb_so_fkfs -->
+	<select id="findFkfsByHtId" parameterType="pd" resultType="pd">
+		SELECT
+		  *
+		FROM
+		  tb_so_fkfs
+		WHERE 
+		  FKFS_HT_UUID=#{AZ_UUID}
+	</select>
+    
+	<!-- 根据AZ_UUID 删除tb_so_fkfs -->
+	<delete id="deleteFkfs" parameterType="pd">
+		delete from tb_so_fkfs where FKFS_HT_UUID=#{AZ_UUID}
+	</delete>
+	
+	<!-- 根据AZ_UUID 删除tb_az_contract -->
+	<delete id="deleteContract" parameterType="pd">
+		delete from tb_az_contract where AZ_UUID=#{AZ_UUID}
+	</delete>
+    
+    <!-- 保存合同信息 -->
+	<insert id="save" parameterType="pd">
+		insert into tb_az_contract
+		(
+			AZ_UUID,
+			AZ_NO,
+			AZ_ITEM_ID,
+			AZ_OFFER_ID,
+			AZ_QDRQ,
+			AZ_MBQX,
+			AZ_JHFS,
+			AZ_ZBJBL,
+			AZ_LXR,
+			AZ_LXDH,
+			AZ_YJKGRQ,
+			AZ_FJSC,
+			AZ_WJLX,
+			AZ_YJSGZQ,
+			AZ_BZ,
+			ACT_KEY,
+			ACT_STATUS,
+			INPUT_USER,
+			INPUT_TIME,
+			customer_name,
+			item_name,
+			DT_NUM,
+			TOTAL,
+			HT_UUID
+		)values(
+			#{AZ_UUID},
+			#{AZ_NO},
+			#{item_id},
+			#{offer_id},
+			#{AZ_QDRQ},
+			#{AZ_MBQX},
+			#{AZ_JHFS},
+			#{AZ_ZBJBL},
+			#{AZ_LXR},
+			#{AZ_LXDH},
+			#{AZ_YJKGRQ},
+			#{AZ_FJSC},
+			#{AZ_WJLX},
+			#{AZ_YJSGZQ},
+			#{AZ_BZ},
+			#{ACT_KEY},
+			#{ACT_STATUS},
+			#{INPUT_USER},
+			#{INPUT_TIME},
+			#{customer_name},
+			#{item_name},
+			#{DTNUM},
+			#{TOTAL},
+			#{HT_UUID}
+		)
+	</insert>
+
+    <!-- 根据AZ_UUID 修改合同信息 -->
+	<update id="edit" parameterType="pd">
+	    UPDATE tb_az_contract
+		SET
+		  AZ_QDRQ        =#{AZ_QDRQ},
+		  AZ_MBQX         =#{AZ_MBQX},
+		  AZ_JHFS         =#{AZ_JHFS},
+		  AZ_ZBJBL        =#{AZ_ZBJBL},
+		  AZ_LXR         =#{AZ_LXR},
+		  AZ_LXDH         =#{AZ_LXDH},
+		  AZ_YJKGRQ        =#{AZ_YJKGRQ},
+		  AZ_FJSC         =#{AZ_FJSC},
+		  AZ_WJLX         =#{AZ_WJLX},
+		  AZ_YJSGZQ       =#{AZ_YJSGZQ},
+		  AZ_BZ           =#{AZ_BZ}
+		Where
+		  AZ_UUID = #{AZ_UUID}
+	</update>
+	
+	<!-- 修改流程Key -->
+    <update id="editAct_Key" parameterType="pd">
+        UPDATE tb_az_contract
+        SET
+        ACT_KEY    =#{ACT_KEY}
+        Where
+        AZ_UUID = #{AZ_UUID}
+    </update>
+    
+    <!-- 修改流程状态 -->
+    <update id="editAct_Status" parameterType="pd">
+        UPDATE tb_az_contract
+        SET
+        ACT_STATUS    =#{ACT_STATUS}
+        Where
+        AZ_UUID = #{AZ_UUID}
+    </update>
+    
+     <!-- 保存应收款信息 -->
+	<insert id="saveYsk" parameterType="pd">
+		insert into tb_so_ysk
+		(
+			YSK_UUID,
+			YSK_HT_ID,
+			YSK_ITEM_ID,
+			YSK_FKFS_ID,
+			YSK_QS,
+			YSK_KX,
+			YSK_YSJE,
+			YSK_YSRQ,
+			YSK_PCTS,
+			YSK_KP_ID,
+			YSK_LK_ID,
+			YSK_BZ,
+			YSK_AZ_NO,
+			item_name
+		)values(
+			#{YSK_UUID},
+			#{YSK_HT_ID},
+			#{YSK_ITEM_ID},
+			#{YSK_FKFS_ID},
+			#{YSK_QS},
+			#{YSK_KX},
+			#{YSK_YSJE},
+			#{YSK_YSRQ},
+			#{YSK_PCTS},
+			#{YSK_KP_ID},
+			#{YSK_LK_ID},
+			#{YSK_BZ},
+			#{YSK_AZ_NO},
+			#{item_name}
+		)
+	</insert>
+	
+	<!-- 应收款信息 列表 -->
+	<select id="SoYsklistPage" parameterType="page" resultType="pd">
+		SELECT
+		  *
+		FROM
+		  tb_so_ysk
+		where 1=1
+		<if test="pd.item_name != null and pd.item_name != ''">
+			and tb_so_ysk.item_name LIKE CONCAT(CONCAT('%',#{pd.item_name}),'%')
+		</if>
+		<if test="pd.HT_NO != null and pd.HT_NO != ''">
+			and tb_so_ysk.HT_NO LIKE CONCAT(CONCAT('%',#{pd.HT_NO}),'%')
+		</if>
+	</select>
+	
+	<!-- 安装合同输出 -->
+    <select id="printContractInstallation" parameterType="page" resultType="pd">
+		select 
+			*
+		from
+			tb_so_contract
+		where 1=1 limit 1
+	</select>
+</mapper>

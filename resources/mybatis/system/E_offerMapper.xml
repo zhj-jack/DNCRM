@@ -1,0 +1,3746 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="E_offerMapper">
+	<!-- 查询全部报价信息 -->
+	<select id="e_offerlistPage" parameterType="page" resultType="pd">
+		SELECT
+		    eo.offer_id,
+			eo.offer_no,
+			i.item_name,
+			i.item_id,
+			customer.customer_name,
+			elev.num,
+			FORMAT(eo.total,'000,000.00') as total,
+			u.USERNAME,
+			eo.instance_id,
+			eo.instance_status
+		FROM
+			tb_e_offer AS eo
+		LEFT JOIN tb_item AS i ON eo.item_id = i.item_id
+		LEFT JOIN (
+			SELECT
+				customer_no,
+				customer_name
+			FROM
+				tb_customer_core
+			UNION
+				SELECT
+					customer_no,
+					customer_name
+				FROM
+					tb_customer_merchant
+				UNION
+					SELECT
+						customer_no,
+						customer_name
+					FROM
+						tb_customer_ordinary
+		) AS customer ON i.customer_no = customer.customer_no
+		LEFT JOIN (
+			SELECT
+				*, COUNT(id) AS num
+			FROM
+				tb_elevator_details
+			GROUP BY
+				item_id
+		) AS elev ON eo.item_id = elev.item_id
+		LEFT JOIN sys_user AS u ON eo.offer_user = u.USER_ID
+		where 1=1 
+		<if test="pd.item_name != null and pd.item_name != ''">
+			and i.item_name LIKE CONCAT(CONCAT('%',#{pd.item_name}),'%')
+		</if>
+		<if test="pd.user_name != null and pd.user_name != ''">
+			and u.USERNAME LIKE CONCAT(CONCAT('%',#{pd.user_name}),'%')
+		</if>
+		<if test="pd.instance_status != null and pd.instance_status != ''">
+			and eo.instance_status LIKE CONCAT(CONCAT('%',#{pd.instance_status}),'%')
+		</if>
+	</select>
+	<!-- 查询全部项目状态==“报价” 的项目信息 -->
+	<select id="itemlistPage" parameterType="page" resultType="pd">
+	   SELECT
+	   i.*, customer.customer_name,COUNT(ed.id) as ednum,us.USERNAME
+	   FROM
+	   tb_item AS i
+	   LEFT JOIN (
+		 SELECT
+		   customer_no,
+		   customer_name
+		 FROM
+		  tb_customer_core
+		 UNION
+		 SELECT
+		   customer_no,
+		   customer_name
+		 FROM
+		   tb_customer_merchant
+		 UNION
+		 SELECT
+		   customer_no,
+		   customer_name
+		 FROM
+		   tb_customer_ordinary
+	   ) AS customer ON i.customer_no = customer.customer_no
+	   LEFT JOIN tb_elevator_details as ed ON i.item_id=ed.item_id
+	   LEFT JOIN sys_user as us ON i.input_user=us.USER_ID
+	   WHERE i.item_status = '2' 
+	    <if test="pd.item_name != null and pd.item_name != ''">
+            and i.item_name LIKE CONCAT(CONCAT('%', #{pd.item_name}),'%')
+        </if>
+	   GROUP BY i.item_id ORDER BY i.input_date DESC
+	</select>
+	<!-- 根据项目编号获取项目信息 -->
+	<select id="findItemById" parameterType="pd" resultType="pd">
+	   SELECT
+	   i.*, customer.customer_name
+	   FROM
+	   tb_item AS i
+	   LEFT JOIN (
+		 SELECT
+		   customer_no,
+		   customer_name
+		 FROM
+		  tb_customer_core
+		 UNION
+		 SELECT
+		   customer_no,
+		   customer_name
+		 FROM
+		   tb_customer_merchant
+		 UNION
+		 SELECT
+		   customer_no,
+		   customer_name
+		 FROM
+		   tb_customer_ordinary
+	   ) AS customer ON i.customer_no = customer.customer_no
+	   where item_no=#{item_no}
+	</select>
+	<!-- 根据报价编号获取信息 -->
+	<select id="findOfferById" parameterType="pd" resultType="pd">
+	   SELECT
+		  eo.*,
+		  i.*,
+		customer.customer_name
+		FROM
+			tb_e_offer as eo
+		LEFT JOIN
+		  tb_item as i
+		ON
+		  eo.item_id=i.item_id
+		LEFT JOIN (
+				 SELECT
+				   customer_no,
+				   customer_name
+				 FROM
+				  tb_customer_core
+				 UNION
+				 SELECT
+				   customer_no,
+				   customer_name
+				 FROM
+				   tb_customer_merchant
+				 UNION
+				 SELECT
+				   customer_no,
+				   customer_name
+				 FROM
+				   tb_customer_ordinary
+			   ) AS customer ON i.customer_no = customer.customer_no
+		WHERE
+			offer_no = #{offer_no}
+	</select>
+	
+	
+	<!-- 根据项目id获取该项目电梯信息 -->
+	<select id="elevatorlistPage" parameterType="page" resultType="pd">
+		<!-- SELECT
+		  ed.*,
+		  m.NAME as models_name,
+		  COUNT(NAME) as modelsNum,
+		  COUNT(IF(flag='1',flag,NULL)) as WNum,
+		  COUNT(IF(flag='2',flag,NULL)) as YNum
+		FROM
+			tb_elevator_details as ed
+		LEFT JOIN
+		  (select id,elevator_id,name from tb_regelev_config
+			UNION
+			select id,elevator_id,name from tb_escalator_config
+			UNION
+			select id,elevator_id,name from tb_homeelev_config
+			) as m
+		ON
+		  ed.models_id=m.ID
+		WHERE
+			item_id = #{pd.item_id}
+		GROUP BY models_name -->
+		SELECT
+		  ed.id,
+		  ed.no,
+		  ed.item_id,
+		  m.models_name,
+		  m.models_id,
+		  m.elevator_id,
+		  COUNT(models_name) as modelsNum,
+		  COUNT(IF(flag='1',flag,NULL)) as WNum,
+		  COUNT(IF(flag='2',flag,NULL)) as YNum
+		FROM
+			tb_elevator_details as ed
+		LEFT JOIN
+		  (select models_id,elevator_id,models_name from tb_models
+			) as m
+		ON
+		  ed.models_id=m.models_id
+		WHERE
+			item_id = #{pd.item_id}
+		GROUP BY models_name
+	</select>
+	<!-- 根据项目id和models_id获取电梯id -->
+	<select id="findEleBYmodels_id" parameterType="pd" resultType="pd">
+		SELECT
+			ed.id as elevID
+		FROM
+			tb_elevator_details as ed
+		WHERE
+			flag = "1"
+		AND ed.models_id = #{models_id}
+		AND ed.item_id = #{item_id}
+	</select>
+	<!-- 获取最后一个录入的报价编号 -->
+	<select id="E_offer_NO" parameterType="pd" resultType="pd">
+	  SELECT offer_no,offer_date FROM tb_e_offer
+      ORDER BY offer_date DESC LIMIT 1	
+	</select>
+    <!-- 根据编号删除数据 -->
+	<delete id="deleteOffer" parameterType="pd">
+		delete from tb_e_offer
+		where offer_no=#{offer_no}
+	</delete>
+
+
+	<!-- 根据类型查询扶梯参数配置 -->
+	<select id="findEscalatorConfigByType" parameterType="String" resultType="pd">
+		<!-- select * from tb_escalator_config where type=#{type} -->
+		select * from (
+		select ec.id,ec.name as 'json',ec.orderNo,ec.parentId,ec.create_time,ec.type,ec.ep_type,'text' as 'param' from tb_escalator_config ec where ec.ep_type='0' union
+		select ec.id,ep.param as 'json',ec.orderNo,ec.parentId,ec.create_time,ec.type,ec.ep_type,ep.type as 'param' from tb_escalator_config ec left join tb_elev_param ep on ep.id=ec.id where ec.ep_type='1'
+		)e where e.type=#{type}
+	</select>
+	
+	<select id="findChildEscalatorConfig" parameterType="String" resultType="pd">
+		select * from (
+		select ec.id,ec.name as 'json',ec.orderNo,ec.parentId,ec.create_time,ec.type,ec.ep_type,'text' as 'param' from tb_escalator_config ec where ec.ep_type='0' union
+		select ec.id,ep.param as 'json',ec.orderNo,ec.parentId,ec.create_time,ec.type,ec.ep_type,ep.type as 'param' from tb_escalator_config ec left join tb_elev_param ep on ep.id=ec.id where ec.ep_type='1'
+		)e where e.parentId=#{id}
+	</select>
+	
+	<select id="findEscalatorStandardPrice"  parameterType="String"  resultType="String">
+		select escalator_standard_price from tb_escalator_standard where id in(
+		select es_id from tb_escalator_config where id=#{id})
+	</select>
+	
+	<select id="findEscalatorStandard" parameterType="String" resultType="pd">
+		select * from tb_escalator_standard where id in(
+			select es_id from tb_escalator_config where id=#{id}
+		)
+	</select>
+	
+	<select id="findEscalatorConfigName" parameterType="String" resultType="String">
+		select name from tb_escalator_config where id=#{id}
+	</select>
+	
+	<!-- 根据关键字查询 -->
+	<select id="findElevatorKeyword"  parameterType="pd" resultType="pd">
+		select * from tb_elevator_keyword where keyword=#{keyword}
+	</select>
+	
+	<!-- 查询字段类型 -->
+	<select id="findPriceTypeByKeyWord" parameterType="String" resultType="String">
+		select price_type from tb_elevator_keyword where keyword=#{keyword} limit 1
+	</select>
+	
+	<!-- 根据字段和传入选项参数查询价格 -->
+	<select id="findPriceOption" parameterType="pd" resultType="pd">
+		select price,unit,price_type,remark,dlvr_date from tb_elevator_keyword where keyword=#{keyword} and param=#{param}
+	</select>
+
+	<!-- 根据字段和传入选项数组查询总价 -->
+	<select id="findPriceOptions" parameterType="pd" resultType="pd">
+		select sum(price) as price from tb_elevator_keyword where keyword =#{keyword} and param in
+		<foreach collection="list"  item="param" index="index" open="(" close=")" separator=",">
+           #{param}
+       	</foreach>
+	</select>
+	
+	<!-- 根据字段查询加价公式 -->
+	<select id="findPriceFormula" parameterType="pd" resultType="pd">
+		select formula,unit,price_type,remark,dlvr_date from tb_elevator_keyword where keyword=#{keyword}
+	</select>
+	
+	<!-- 根据字段查询单价 -->
+	<select id="findPriceUnit" parameterType="pd" resultType="Pd">
+		select price,unit,price_type,remark,dlvr_date from tb_elevator_keyword where keyword=#{keyword}
+	</select>
+	<!-- 保存报价信息 -->
+	<insert id="saveS" parameterType="pd">
+		insert into tb_e_offer
+		(
+			offer_id,
+			offer_no,
+			item_id,
+			total,
+			instance_status,
+			instance_id,
+			offer_date,
+			offer_user,
+			modify_date,
+			modify_user,
+			offer_num,
+			SWXX_SFFHQFQ,
+			SWXX_DJ,
+			SWXX_PCK,
+			SWXX_FHK,
+			SWXX_HDGDK,
+			SWXX_YSK,
+			SWXX_FKBL_FHQ,
+			SWXX_FKBL_HDGD,
+			SWXX_FKBL_YSHG,
+			SWXX_TBBH_SX,
+			SWXX_TBBH_BL,
+			SWXX_YFKBH_BL,
+			SWXX_YFKBH_SX,
+			SWXX_LYBH_BL,
+			SWXX_LYBH_SX,
+			SWXX_ZLBH_BL,
+			SWXX_ZLBH_SX,
+			SWXX_ZBJBL,
+			SWXX_MBQX,
+			OFFER_KEY,
+			ZHEKOU
+		)values(
+			#{offer_id},
+			#{offer_no},
+			#{item_id},
+			#{total},
+			#{instance_status},
+			#{instance_id},
+			#{offer_date},
+			#{offer_user},
+			#{modify_date},
+			#{modify_user},
+			#{offer_num},
+			#{SWXX_SFFHQFQ},
+			#{SWXX_DJ},
+			#{SWXX_PCK},
+			#{SWXX_FHK},
+			#{SWXX_HDGDK},
+			#{SWXX_YSK},
+			#{SWXX_FKBL_FHQ},
+			#{SWXX_FKBL_HDGD},
+			#{SWXX_FKBL_YSHG},
+			#{SWXX_TBBH_SX},
+			#{SWXX_TBBH_BL},
+			#{SWXX_YFKBH_BL},
+			#{SWXX_YFKBH_SX},
+			#{SWXX_LYBH_BL},
+			#{SWXX_LYBH_SX},
+			#{SWXX_ZLBH_BL},
+			#{SWXX_ZLBH_SX},
+			#{SWXX_ZBJBL},
+			#{SWXX_MBQX},
+			#{KEY},
+			#{ZHEKOU}
+		)
+	</insert>
+	<!-- 根据ID修改报价信息 -->
+	<update id="editS" parameterType="pd">
+	    UPDATE tb_e_offer
+		SET
+		offer_no          =#{offer_no},
+		item_id           =#{item_id},
+		total             =#{total},
+		instance_status   =#{instance_status},
+		instance_id       =#{instance_id},
+	    offer_date        =#{offer_date},
+		offer_user        =#{offer_user},
+		modify_date       =#{modify_date},
+		modify_user       =#{modify_user},
+		offer_num         =#{offer_num},
+		SWXX_SFFHQFQ      =#{SWXX_SFFHQFQ},
+		SWXX_DJ           =#{SWXX_DJ},
+		SWXX_PCK          =#{SWXX_PCK},
+		SWXX_FHK          =#{SWXX_FHK},
+		SWXX_HDGDK        =#{SWXX_HDGDK},
+		SWXX_YSK          =#{SWXX_YSK},
+		SWXX_FKBL_FHQ     =#{SWXX_FKBL_FHQ},
+		SWXX_FKBL_HDGD    =#{SWXX_FKBL_HDGD},
+		SWXX_FKBL_YSHG    =#{SWXX_FKBL_YSHG},
+		SWXX_TBBH_SX      =#{SWXX_TBBH_SX},
+		SWXX_TBBH_BL      =#{SWXX_TBBH_BL},
+		SWXX_YFKBH_BL     =#{SWXX_YFKBH_BL},
+		SWXX_YFKBH_SX     =#{SWXX_YFKBH_SX},
+		SWXX_LYBH_BL      =#{SWXX_LYBH_BL},
+		SWXX_LYBH_SX      =#{SWXX_LYBH_SX},
+		SWXX_ZLBH_BL      =#{SWXX_ZLBH_BL},
+		SWXX_ZLBH_SX      =#{SWXX_ZLBH_SX},
+		SWXX_ZBJBL        =#{SWXX_ZBJBL},
+		SWXX_MBQX         =#{SWXX_MBQX},
+		OFFER_KEY         =#{KEY},
+		ZHEKOU            =#{ZHEKOU}  
+		Where
+		offer_id = #{offer_id}
+	</update>
+	<!-- 根据ID补充报价信息 -->
+	<update id="editItem" parameterType="pd">
+	    UPDATE tb_item
+		SET
+		agreement_possible    =#{agreement_possible},
+		market_type           =#{market_type},
+		self_inferiority      =#{self_inferiority}
+		Where
+		item_id = #{item_id}
+	</update>
+	<!-- 保存扶梯报价明细信息 -->
+	<insert id="saveEscalator" parameterType="pd">
+		insert into tb_escalator(
+			esca_id,
+			offer_id,
+			model_id,
+			esca_angle,
+			esca_spec,
+			esca_width,
+			esca_num,
+			discount,
+			floor,
+			eqpt_price,
+			disc_price,
+			install_price,
+			trans_price,
+			last_offer,
+			esca_base,
+			esca_part,
+			esca_std,
+			esca_opt,
+			esca_env,
+			esca_unstd,
+			elevator_id
+		)values(
+			#{esca_id},
+			#{offer_id},
+			#{model_id},
+			#{esca_angle},
+			#{esca_spec},
+			#{esca_width},
+			#{esca_num},
+			#{discount},
+			#{floor},
+			#{eqpt_price},
+			#{disc_price},
+			#{install_price},
+			#{trans_price},
+			#{last_offer},
+			#{esca_base},
+			#{esca_part},
+			#{esca_std},
+			#{esca_opt},
+			#{esca_env},
+			#{esca_unstd},
+			#{elevator_id}
+		)
+	</insert>
+	<!-- 查询流程是否存在 -->
+	<select id="instance_key" parameterType="pd" resultType="pd">
+	    SELECT
+	      *
+        FROM
+	      act_re_procdef
+        WHERE
+	      KEY_ = #{KEY}
+	</select>
+	<!-- 修改流程key字段为流程实例id -->
+	<update id="upfindById" parameterType="pd">
+	    UPDATE tb_e_offer
+		SET
+		stra_uuid                   =#{stra_uuid}
+		Where
+		stra_no=#{stra_no}
+	</update>
+	<!-- 修改流程状态 -->
+	<update id="editInstance_status" parameterType="pd">
+	    UPDATE tb_e_offer
+		SET
+		instance_status    =#{instance_status}
+		Where
+		offer_id = #{offer_id}
+	</update>
+	 <!-- 根据uuid查询基本信息 -->
+	<select id="findByuuId" parameterType="page" resultType="pd">
+		SELECT
+		    eo.*,
+			i.item_name,
+			customer.customer_name,
+			elev.num,
+			FORMAT(eo.total,'000,000.00') as total,
+			u.USERNAME
+		FROM
+			tb_e_offer AS eo
+		LEFT JOIN tb_item AS i ON eo.item_id = i.item_id
+		LEFT JOIN (
+			SELECT
+				customer_no,
+				customer_name
+			FROM
+				tb_customer_core
+			UNION
+				SELECT
+					customer_no,
+					customer_name
+				FROM
+					tb_customer_merchant
+				UNION
+					SELECT
+						customer_no,
+						customer_name
+					FROM
+						tb_customer_ordinary
+		) AS customer ON i.customer_no = customer.customer_no
+		LEFT JOIN (
+			SELECT
+				*, COUNT(id) AS num
+			FROM
+				tb_elevator_details
+			GROUP BY
+				item_id
+		) AS elev ON eo.item_id = elev.item_id
+		LEFT JOIN sys_user AS u ON eo.offer_user = u.USER_ID
+		where eo.offer_id=#{offer_id}
+	</select>
+	
+	<!-- 查询运输价格 -->
+	<select id="findTrans" parameterType="pd" resultType="pd">
+		select * from tb_transportation where province_id=#{province_id} and city_id=#{city_id}
+	</select>
+	
+	<!-- 查询联动目的地 -->
+	<select id="findAllDestinByProvinceId" parameterType="pd" resultType="pd">
+		select * from tb_loc_destination where 1=1
+		<if test="province_id!=null and province_id!=''">
+			and province_id = #{province_id}
+		</if>
+	</select>
+	
+	<!-- 报价之后更新电梯 -->
+	<update id="updateElevatorDetails" parameterType="pd">
+		update tb_elevator_details set models_id=#{models_id},total=#{total},flag=#{flag} where id=#{id}
+	</update>
+	
+	
+	<!-- 飞尚梯保存 -->
+	<insert id="saveFeishang" parameterType="pd">
+		INSERT INTO TB_FEISHANG(
+			FEISHANG_ID,
+			FEISHANG_ZHJ,
+			FEISHANG_SBJ,
+			FEISHANG_ZK,
+			FEISHANG_ZHSBJ,
+			FEISHANG_AZF,
+			FEISHANG_YSF,
+			FEISHANG_SJBJ,
+			FEISHANG_SL,
+			ELEV_IDS,
+			ITEM_ID,
+			MODELS_ID,
+			BZ_ZZ,
+			BZ_SD,
+			BZ_KMXS,
+			BZ_KMKD,
+			BZ_C,
+			BZ_Z,
+			BZ_M,
+			BASE_KZXT,
+			BASE_KZFS,
+			BASE_YYZJ,
+			BASE_JDJG,
+			BASE_QGLJJ,
+			BASE_JXGG,
+			BASE_JXGD,
+			BASE_KMCC,
+			BASE_JXRKSL,
+			BASE_MLXMBH,
+			BASE_JDCZQHD,
+			BASE_JDK,
+			BASE_JDS,
+			BASE_TSGD,
+			BASE_DKSD,
+			BASE_DCGD,
+			BASE_JDZG,
+			BASE_JZZT,
+			BASE_LCBJ,
+			BASE_DGZJ,
+			OPT_SZTJMSJ,
+			OPT_XFLD,
+			OPT_XFYYX,
+			OPT_TWXFYFW,
+			OPT_JXDZZ,
+			OPT_CCTVDL,
+			OPT_TDYJJY,
+			OPT_DJGRBH,
+			OPT_WLW,
+			OPT_SJCZ,
+			OPT_BAJK,
+			OPT_YYBZ,
+			OPT_FDLCZ,
+			OPT_XJX,
+			OPT_JJBYDYCZZZ,
+			OPT_LOPAN,
+			OPT_LOPANGS,
+			OPT_GTJX,
+			OPT_GTCS,
+			DZJKSDJXT_DJTXFS,
+			DZJKSDJXT_DJDDTTS,
+			JXZH_JM,
+			JXZH_JMSBH,
+			JXZH_QWB,
+			JXZH_QWBSBH,
+			JXZH_CWB,
+			JXZH_CWBSBH,
+			JXZH_HWB,
+			JXZH_HWBSBH,
+			JXZH_JDZH,
+			JXZH_BXGDD,
+			JXZH_BXGDB,
+			JXZH_BGJ,
+			JXZH_DBXH,
+			JXZH_DBZXHD,
+			JXZH_FZTXH,
+			JXZH_FZTAZWZ,
+			TMMT_FWBXGTM,
+			TMMT_FWBXGXMT,
+			TMMT_DMT,
+			TMMT_SCTMMT,
+			TMMT_SCSBH,
+			TMMT_SCSL,
+			TMMT_FSCTMMT,
+			TMMT_FSCSBH,
+			TMMT_FSCSL,
+			CZP_CZPLX,
+			CZP_CZPXH,
+			CZP_XS,
+			CZP_AN,
+			CZP_CZ,
+			CZP_CZPWZ,
+			TMXHZZ_TWZHLX,
+			TMXHZZ_TWZHXH,
+			TMXHZZ_XS,
+			TMXHZZ_AN,
+			TMXHZZ_CZ,
+			TMXHZZ_TWZHXS,
+			TMXHZZ_ZDJC,
+			TMXHZZ_MCGS,
+			TMXHZZ_FJSM,
+			UNSTD
+		)VALUES(
+			#{FEISHANG_ID},
+			#{FEISHANG_ZHJ},
+			#{FEISHANG_SBJ},
+			#{FEISHANG_ZK},
+			#{FEISHANG_ZHSBJ},
+			#{FEISHANG_AZF},
+			#{FEISHANG_YSF},
+			#{FEISHANG_SJBJ},
+			#{FEISHANG_SL},
+			#{ELEV_IDS},
+			#{ITEM_ID},
+			#{MODELS_ID},
+			#{BZ_ZZ},
+			#{BZ_SD},
+			#{BZ_KMXS},
+			#{BZ_KMKD},
+			#{BZ_C},
+			#{BZ_Z},
+			#{BZ_M},
+			#{BASE_KZXT},
+			#{BASE_KZFS},
+			#{BASE_YYZJ},
+			#{BASE_JDJG},
+			#{BASE_QGLJJ},
+			#{BASE_JXGG},
+			#{BASE_JXGD},
+			#{BASE_KMCC},
+			#{BASE_JXRKSL},
+			#{BASE_MLXMBH},
+			#{BASE_JDCZQHD},
+			#{BASE_JDK},
+			#{BASE_JDS},
+			#{BASE_TSGD},
+			#{BASE_DKSD},
+			#{BASE_DCGD},
+			#{BASE_JDZG},
+			#{BASE_JZZT},
+			#{BASE_LCBJ},
+			#{BASE_DGZJ},
+			#{OPT_SZTJMSJ},
+			#{OPT_XFLD},
+			#{OPT_XFYYX},
+			#{OPT_TWXFYFW},
+			#{OPT_JXDZZ},
+			#{OPT_CCTVDL},
+			#{OPT_TDYJJY},
+			#{OPT_DJGRBH},
+			#{OPT_WLW},
+			#{OPT_SJCZ},
+			#{OPT_BAJK},
+			#{OPT_YYBZ},
+			#{OPT_FDLCZ},
+			#{OPT_XJX},
+			#{OPT_JJBYDYCZZZ},
+			#{OPT_LOPAN},
+			#{OPT_LOPANGS},
+			#{OPT_GTJX},
+			#{OPT_GTCS},
+			#{DZJKSDJXT_DJTXFS},
+			#{DZJKSDJXT_DJDDTTS},
+			#{JXZH_JM},
+			#{JXZH_JMSBH},
+			#{JXZH_QWB},
+			#{JXZH_QWBSBH},
+			#{JXZH_CWB},
+			#{JXZH_CWBSBH},
+			#{JXZH_HWB},
+			#{JXZH_HWBSBH},
+			#{JXZH_JDZH},
+			#{JXZH_BXGDD},
+			#{JXZH_BXGDB},
+			#{JXZH_BGJ},
+			#{JXZH_DBXH},
+			#{JXZH_DBZXHD},
+			#{JXZH_FZTXH},
+			#{JXZH_FZTAZWZ},
+			#{TMMT_FWBXGTM},
+			#{TMMT_FWBXGXMT},
+			#{TMMT_DMT},
+			#{TMMT_SCTMMT},
+			#{TMMT_SCSBH},
+			#{TMMT_SCSL},
+			#{TMMT_FSCTMMT},
+			#{TMMT_FSCSBH},
+			#{TMMT_FSCSL},
+			#{CZP_CZPLX},
+			#{CZP_CZPXH},
+			#{CZP_XS},
+			#{CZP_AN},
+			#{CZP_CZ},
+			#{CZP_CZPWZ},
+			#{TMXHZZ_TWZHLX},
+			#{TMXHZZ_TWZHXH},
+			#{TMXHZZ_XS},
+			#{TMXHZZ_AN},
+			#{TMXHZZ_CZ},
+			#{TMXHZZ_TWZHXS},
+			#{TMXHZZ_ZDJC},
+			#{TMXHZZ_MCGS},
+			#{TMXHZZ_FJSM},
+			#{UNSTD}
+		)
+	</insert>
+	
+	
+	<!-- feishang修改 -->
+	<update id="updateFeishang" parameterType="pd">
+		UPDATE TB_FEISHANG SET
+			FEISHANG_ZHJ=#{FEISHANG_ZHJ},
+			FEISHANG_SBJ=#{FEISHANG_SBJ},
+			FEISHANG_ZK=#{FEISHANG_ZK},
+			FEISHANG_ZHSBJ=#{FEISHANG_ZHSBJ},
+			FEISHANG_AZF=#{FEISHANG_AZF},
+			FEISHANG_YSF=#{FEISHANG_YSF},
+			FEISHANG_SJBJ=#{FEISHANG_SJBJ},
+			FEISHANG_SL=#{FEISHANG_SL},
+			ELEV_IDS=#{ELEV_IDS},
+			ITEM_ID=#{ITEM_ID},
+			MODELS_ID=#{MODELS_ID},
+			BZ_ZZ=#{BZ_ZZ},
+			BZ_SD=#{BZ_SD},
+			BZ_KMXS=#{BZ_KMXS},
+			BZ_KMKD=#{BZ_KMKD},
+			BZ_C=#{BZ_C},
+			BZ_Z=#{BZ_Z},
+			BZ_M=#{BZ_M},
+			BASE_KZXT=#{BASE_KZXT},
+			BASE_KZFS=#{BASE_KZFS},
+			BASE_YYZJ=#{BASE_YYZJ},
+			BASE_JDJG=#{BASE_JDJG},
+			BASE_QGLJJ=#{BASE_QGLJJ},
+			BASE_JXGG=#{BASE_JXGG},
+			BASE_JXGD=#{BASE_JXGD},
+			BASE_KMCC=#{BASE_KMCC},
+			BASE_JXRKSL=#{BASE_JXRKSL},
+			BASE_MLXMBH=#{BASE_MLXMBH},
+			BASE_JDCZQHD=#{BASE_JDCZQHD},
+			BASE_JDK=#{BASE_JDK},
+			BASE_JDS=#{BASE_JDS},
+			BASE_TSGD=#{BASE_TSGD},
+			BASE_DKSD=#{BASE_DKSD},
+			BASE_DCGD=#{BASE_DCGD},
+			BASE_JDZG=#{BASE_JDZG},
+			BASE_JZZT=#{BASE_JZZT},
+			BASE_LCBJ=#{BASE_LCBJ},
+			BASE_DGZJ=#{BASE_DGZJ},
+			OPT_SZTJMSJ=#{OPT_SZTJMSJ},
+			OPT_XFLD=#{OPT_XFLD},
+			OPT_XFYYX=#{OPT_XFYYX},
+			OPT_TWXFYFW=#{OPT_TWXFYFW},
+			OPT_JXDZZ=#{OPT_JXDZZ},
+			OPT_CCTVDL=#{OPT_CCTVDL},
+			OPT_TDYJJY=#{OPT_TDYJJY},
+			OPT_DJGRBH=#{OPT_DJGRBH},
+			OPT_WLW=#{OPT_WLW},
+			OPT_SJCZ=#{OPT_SJCZ},
+			OPT_BAJK=#{OPT_BAJK},
+			OPT_YYBZ=#{OPT_YYBZ},
+			OPT_FDLCZ=#{OPT_FDLCZ},
+			OPT_XJX=#{OPT_XJX},
+			OPT_JJBYDYCZZZ=#{OPT_JJBYDYCZZZ},
+			OPT_LOPAN=#{OPT_LOPAN},
+			OPT_LOPANGS=#{OPT_LOPANGS},
+			OPT_GTJX=#{OPT_GTJX},
+			OPT_GTCS=#{OPT_GTCS},
+			DZJKSDJXT_DJTXFS=#{DZJKSDJXT_DJTXFS},
+			DZJKSDJXT_DJDDTTS=#{DZJKSDJXT_DJDDTTS},
+			JXZH_JM=#{JXZH_JM},
+			JXZH_JMSBH=#{JXZH_JMSBH},
+			JXZH_QWB=#{JXZH_QWB},
+			JXZH_QWBSBH=#{JXZH_QWBSBH},
+			JXZH_CWB=#{JXZH_CWB},
+			JXZH_CWBSBH=#{JXZH_CWBSBH},
+			JXZH_HWB=#{JXZH_HWB},
+			JXZH_HWBSBH=#{JXZH_HWBSBH},
+			JXZH_JDZH=#{JXZH_JDZH},
+			JXZH_BXGDD=#{JXZH_BXGDD},
+			JXZH_BXGDB=#{JXZH_BXGDB},
+			JXZH_BGJ=#{JXZH_BGJ},
+			JXZH_DBXH=#{JXZH_DBXH},
+			JXZH_DBZXHD=#{JXZH_DBZXHD},
+			JXZH_FZTXH=#{JXZH_FZTXH},
+			JXZH_FZTAZWZ=#{JXZH_FZTAZWZ},
+			TMMT_FWBXGTM=#{TMMT_FWBXGTM},
+			TMMT_FWBXGXMT=#{TMMT_FWBXGXMT},
+			TMMT_DMT=#{TMMT_DMT},
+			TMMT_SCTMMT=#{TMMT_SCTMMT},
+			TMMT_SCSBH=#{TMMT_SCSBH},
+			TMMT_SCSL=#{TMMT_SCSL},
+			TMMT_FSCTMMT=#{TMMT_FSCTMMT},
+			TMMT_FSCSBH=#{TMMT_FSCSBH},
+			TMMT_FSCSL=#{TMMT_FSCSL},
+			CZP_CZPLX=#{CZP_CZPLX},
+			CZP_CZPXH=#{CZP_CZPXH},
+			CZP_XS=#{CZP_XS},
+			CZP_AN=#{CZP_AN},
+			CZP_CZ=#{CZP_CZ},
+			CZP_CZPWZ=#{CZP_CZPWZ},
+			TMXHZZ_TWZHLX=#{TMXHZZ_TWZHLX},
+			TMXHZZ_TWZHXH=#{TMXHZZ_TWZHXH},
+			TMXHZZ_XS=#{TMXHZZ_XS},
+			TMXHZZ_AN=#{TMXHZZ_AN},
+			TMXHZZ_CZ=#{TMXHZZ_CZ},
+			TMXHZZ_TWZHXS=#{TMXHZZ_TWZHXS},
+			TMXHZZ_ZDJC=#{TMXHZZ_ZDJC},
+			TMXHZZ_MCGS=#{TMXHZZ_MCGS},
+			TMXHZZ_FJSM=#{TMXHZZ_FJSM},
+			UNSTD=#{UNSTD}
+		WHERE 
+			FEISHANG_ID=#{FEISHANG_ID}
+	</update>
+	
+	<select id="bjc_list" parameterType="pd" resultType="pd">
+	    <!-- select * from tb_bjc where BJC_ITEM_ID=#{item_id} -->
+	    select a.*,b.MODELS_NAME from tb_bjc a
+		left join tb_models b on a.bjc_models=b.models_id
+		where a.bjc_item_id=#{item_id}
+	</select>
+	
+		
+	
+	<!-- 飞扬3000+MRL梯保存 -->
+	<insert id="saveFeiyangMRL" parameterType="pd">
+		INSERT INTO TB_FEIYANG_MRL(
+			FEIYANGMRL_ID,
+			FEIYANGMRL_AZF,
+			FEIYANGMRL_YSF,
+			FEIYANGMRL_SL,
+			FEIYANGMRL_ZK,
+			FEIYANGMRL_ZHJ,
+			FEIYANGMRL_SBJ,
+			FEIYANGMRL_ZHSBJ,
+			FEIYANGMRL_SJBJ,
+			ELEV_IDS,
+			ITEM_ID,
+			MODELS_ID,
+			BZ_ZZ,
+			BZ_SD,
+			BZ_KMXS,
+			BZ_KMKD,
+			BZ_C,
+			BZ_Z,
+			BZ_M,
+			BASE_KZXT,
+			BASE_KZFS,
+			BASE_JDJG,
+			BASE_QGLJJ,
+			BASE_JXGG,
+			BASE_JXGD,
+			BASE_KMCC,
+			BASE_MLXMBH,
+			BASE_JDCZQHD,
+			BASE_JDK,
+			BASE_JDS,
+			BASE_TSGD,
+			BASE_DKSD,
+			BASE_DCGD,
+			BASE_JDZG,
+			BASE_JZZT,
+			BASE_LCBJ,
+			BASE_DGZJ,
+			OPT_MWAN,
+			OPT_HJZDFHJZ,
+			OPT_XFYYX,
+			OPT_JXDZZ,
+			OPT_CCTVDL,
+			OPT_TDJJJY,
+			OPT_DJGRBH,
+			OPT_KQJHZZ,
+			OPT_NMYKJAN,
+			OPT_FDLCZ,
+			OPT_ZPC,
+			OPT_BAJK,
+			OPT_YYBZ,
+			OPT_QPGM,
+			OPT_DLFW,
+			OPT_KMBC,
+			OPT_DZYX,
+			OPT_NLHK,
+			OPT_YCJK,
+			OPT_ICK,
+			OPT_ICKZKSB,
+			OPT_ICKKP,
+			OPT_PTDTKT,
+			OPT_ZYFTSDTKT,
+			OPT_JKGM,
+			OPT_JKYYJ,
+			OPT_GTMJXJMBF,
+			OPT_GTMTMBF,
+			OPT_GTMS,
+			OPT_CMZH,
+			OPT_JFGT,
+			OPT_DJT,
+			DZJKSDJXT_DJTXFS,
+			DZJKSDJXT_DJTS,
+			JXZH_JM,
+			JXZH_JMSBH,
+			JXZH_JMZH,
+			JXZH_JXZH,
+			JXZH_QWB,
+			JXZH_QWBSBH,
+			JXZH_CWB,
+			JXZH_CWBSBH,
+			JXZH_HWB,
+			JXZH_HWBSBH,
+			JXZH_JDZH,
+			JXZH_ZSDD,
+			JXZH_AQC,
+			JXZH_BGJ,
+			JXZH_DBXH,
+			JXZH_DBZXHD,
+			JXZH_YLZHZL,
+			JXZH_FSXH,
+			JXZH_FSAZWZ,
+			TMMT_FWBXGXMT,
+			TMMT_PTDMT,
+			TMMT_PTJMBXGTM,
+			TMMT_SCTMMT,
+			TMMT_SCSBH,
+			TMMT_FSCTMMT,
+			TMMT_FSCSBH,
+			TMXHZZ_TWZHLX,
+			TMXHZZ_TWZHXH,
+			TMXHZZ_XS,
+			TMXHZZ_AN,
+			TMXHZZ_CZ,
+			TMXHZZ_ZDJC,
+			TMXHZZ_MCGS,
+			TMXHZZ_FJSM,
+			TMXHZZ_WZYCOPMWAN,
+			CZP_CZPLX,
+			CZP_CZPXH,
+			CZP_XS,
+			CZP_AN,
+			CZP_CZ,
+			CZP_CZPWZ,
+			CZP_XS_SUB,
+			UNSTD
+		)VALUES(
+			#{FEIYANGMRL_ID},
+			#{FEIYANGMRL_AZF},
+			#{FEIYANGMRL_YSF},
+			#{FEIYANGMRL_SL},
+			#{FEIYANGMRL_ZK},
+			#{FEIYANGMRL_ZHJ},
+			#{FEIYANGMRL_SBJ},
+			#{FEIYANGMRL_ZHSBJ},
+			#{FEIYANGMRL_SJBJ},
+			#{ELEV_IDS},
+			#{ITEM_ID},
+			#{MODELS_ID},
+			#{BZ_ZZ},
+			#{BZ_SD},
+			#{BZ_KMXS},
+			#{BZ_KMKD},
+			#{BZ_C},
+			#{BZ_Z},
+			#{BZ_M},
+			#{BASE_KZXT},
+			#{BASE_KZFS},
+			#{BASE_JDJG},
+			#{BASE_QGLJJ},
+			#{BASE_JXGG},
+			#{BASE_JXGD},
+			#{BASE_KMCC},
+			#{BASE_MLXMBH},
+			#{BASE_JDCZQHD},
+			#{BASE_JDK},
+			#{BASE_JDS},
+			#{BASE_TSGD},
+			#{BASE_DKSD},
+			#{BASE_DCGD},
+			#{BASE_JDZG},
+			#{BASE_JZZT},
+			#{BASE_LCBJ},
+			#{BASE_DGZJ},
+			#{OPT_MWAN},
+			#{OPT_HJZDFHJZ},
+			#{OPT_XFYYX},
+			#{OPT_JXDZZ},
+			#{OPT_CCTVDL},
+			#{OPT_TDJJJY},
+			#{OPT_DJGRBH},
+			#{OPT_KQJHZZ},
+			#{OPT_NMYKJAN},
+			#{OPT_FDLCZ},
+			#{OPT_ZPC},
+			#{OPT_BAJK},
+			#{OPT_YYBZ},
+			#{OPT_QPGM},
+			#{OPT_DLFW},
+			#{OPT_KMBC},
+			#{OPT_DZYX},
+			#{OPT_NLHK},
+			#{OPT_YCJK},
+			#{OPT_ICK},
+			#{OPT_ICKZKSB},
+			#{OPT_ICKKP},
+			#{OPT_PTDTKT},
+			#{OPT_ZYFTSDTKT},
+			#{OPT_JKGM},
+			#{OPT_JKYYJ},
+			#{OPT_GTMJXJMBF},
+			#{OPT_GTMTMBF},
+			#{OPT_GTMS},
+			#{OPT_CMZH},
+			#{OPT_JFGT},
+			#{OPT_DJT},
+			#{DZJKSDJXT_DJTXFS},
+			#{DZJKSDJXT_DJTS},
+			#{JXZH_JM},
+			#{JXZH_JMSBH},
+			#{JXZH_JMZH},
+			#{JXZH_JXZH},
+			#{JXZH_QWB},
+			#{JXZH_QWBSBH},
+			#{JXZH_CWB},
+			#{JXZH_CWBSBH},
+			#{JXZH_HWB},
+			#{JXZH_HWBSBH},
+			#{JXZH_JDZH},
+			#{JXZH_ZSDD},
+			#{JXZH_AQC},
+			#{JXZH_BGJ},
+			#{JXZH_DBXH},
+			#{JXZH_DBZXHD},
+			#{JXZH_YLZHZL},
+			#{JXZH_FSXH},
+			#{JXZH_FSAZWZ},
+			#{TMMT_FWBXGXMT},
+			#{TMMT_PTDMT},
+			#{TMMT_PTJMBXGTM},
+			#{TMMT_SCTMMT},
+			#{TMMT_SCSBH},
+			#{TMMT_FSCTMMT},
+			#{TMMT_FSCSBH},
+			#{TMXHZZ_TWZHLX},
+			#{TMXHZZ_TWZHXH},
+			#{TMXHZZ_XS},
+			#{TMXHZZ_AN},
+			#{TMXHZZ_CZ},
+			#{TMXHZZ_ZDJC},
+			#{TMXHZZ_MCGS},
+			#{TMXHZZ_FJSM},
+			#{TMXHZZ_WZYCOPMWAN},
+			#{CZP_CZPLX},
+			#{CZP_CZPXH},
+			#{CZP_XS},
+			#{CZP_AN},
+			#{CZP_CZ},
+			#{CZP_CZPWZ},
+			#{CZP_XS_SUB},
+			#{UNSTD}
+		)
+	</insert>
+	
+	<!-- feiyangmrl编辑 -->
+	<update id="updateFeiyangMRL" parameterType="pd">
+		UPDATE TB_FEIYANG_MRL SET
+			FEIYANGMRL_AZF=#{FEIYANGMRL_AZF},
+			FEIYANGMRL_YSF=#{FEIYANGMRL_YSF},
+			FEIYANGMRL_SL=#{FEIYANGMRL_SL},
+			FEIYANGMRL_ZK=#{FEIYANGMRL_ZK},
+			FEIYANGMRL_ZHJ=#{FEIYANGMRL_ZHJ},
+			FEIYANGMRL_SBJ=#{FEIYANGMRL_SBJ},
+			FEIYANGMRL_ZHSBJ=#{FEIYANGMRL_ZHSBJ},
+			FEIYANGMRL_SJBJ=#{FEIYANGMRL_SJBJ},
+			ELEV_IDS=#{ELEV_IDS},
+			ITEM_ID=#{ITEM_ID},
+			MODELS_ID=#{MODELS_ID},
+			BZ_ZZ=#{BZ_ZZ},
+			BZ_SD=#{BZ_SD},
+			BZ_KMXS=#{BZ_KMXS},
+			BZ_KMKD=#{BZ_KMKD},
+			BZ_C=#{BZ_C},
+			BZ_Z=#{BZ_Z},
+			BZ_M=#{BZ_M},
+			BASE_KZXT=#{BASE_KZXT},
+			BASE_KZFS=#{BASE_KZFS},
+			BASE_JDJG=#{BASE_JDJG},
+			BASE_QGLJJ=#{BASE_QGLJJ},
+			BASE_JXGG=#{BASE_JXGG},
+			BASE_JXGD=#{BASE_JXGD},
+			BASE_KMCC=#{BASE_KMCC},
+			BASE_MLXMBH=#{BASE_MLXMBH},
+			BASE_JDCZQHD=#{BASE_JDCZQHD},
+			BASE_JDK=#{BASE_JDK},
+			BASE_JDS=#{BASE_JDS},
+			BASE_TSGD=#{BASE_TSGD},
+			BASE_DKSD=#{BASE_DKSD},
+			BASE_DCGD=#{BASE_DCGD},
+			BASE_JDZG=#{BASE_JDZG},
+			BASE_JZZT=#{BASE_JZZT},
+			BASE_LCBJ=#{BASE_LCBJ},
+			BASE_DGZJ=#{BASE_DGZJ},
+			OPT_MWAN=#{OPT_MWAN},
+			OPT_HJZDFHJZ=#{OPT_HJZDFHJZ},
+			OPT_XFYYX=#{OPT_XFYYX},
+			OPT_JXDZZ=#{OPT_JXDZZ},
+			OPT_CCTVDL=#{OPT_CCTVDL},
+			OPT_TDJJJY=#{OPT_TDJJJY},
+			OPT_DJGRBH=#{OPT_DJGRBH},
+			OPT_KQJHZZ=#{OPT_KQJHZZ},
+			OPT_NMYKJAN=#{OPT_NMYKJAN},
+			OPT_FDLCZ=#{OPT_FDLCZ},
+			OPT_ZPC=#{OPT_ZPC},
+			OPT_BAJK=#{OPT_BAJK},
+			OPT_YYBZ=#{OPT_YYBZ},
+			OPT_QPGM=#{OPT_QPGM},
+			OPT_DLFW=#{OPT_DLFW},
+			OPT_KMBC=#{OPT_KMBC},
+			OPT_DZYX=#{OPT_DZYX},
+			OPT_NLHK=#{OPT_NLHK},
+			OPT_YCJK=#{OPT_YCJK},
+			OPT_ICK=#{OPT_ICK},
+			OPT_ICKZKSB=#{OPT_ICKZKSB},
+			OPT_ICKKP=#{OPT_ICKKP},
+			OPT_PTDTKT=#{OPT_PTDTKT},
+			OPT_ZYFTSDTKT=#{OPT_ZYFTSDTKT},
+			OPT_JKGM=#{OPT_JKGM},
+			OPT_JKYYJ=#{OPT_JKYYJ},
+			OPT_GTMJXJMBF=#{OPT_GTMJXJMBF},
+			OPT_GTMTMBF=#{OPT_GTMTMBF},
+			OPT_GTMS=#{OPT_GTMS},
+			OPT_CMZH=#{OPT_CMZH},
+			OPT_JFGT=#{OPT_JFGT},
+			OPT_DJT=#{OPT_DJT},
+			DZJKSDJXT_DJTXFS=#{DZJKSDJXT_DJTXFS},
+			DZJKSDJXT_DJTS=#{DZJKSDJXT_DJTS},
+			JXZH_JM=#{JXZH_JM},
+			JXZH_JMSBH=#{JXZH_JMSBH},
+			JXZH_JMZH=#{JXZH_JMZH},
+			JXZH_JXZH=#{JXZH_JXZH},
+			JXZH_QWB=#{JXZH_QWB},
+			JXZH_QWBSBH=#{JXZH_QWBSBH},
+			JXZH_CWB=#{JXZH_CWB},
+			JXZH_CWBSBH=#{JXZH_CWBSBH},
+			JXZH_HWB=#{JXZH_HWB},
+			JXZH_HWBSBH=#{JXZH_HWBSBH},
+			JXZH_JDZH=#{JXZH_JDZH},
+			JXZH_ZSDD=#{JXZH_ZSDD},
+			JXZH_AQC=#{JXZH_AQC},
+			JXZH_BGJ=#{JXZH_BGJ},
+			JXZH_DBXH=#{JXZH_DBXH},
+			JXZH_DBZXHD=#{JXZH_DBZXHD},
+			JXZH_YLZHZL=#{JXZH_YLZHZL},
+			JXZH_FSXH=#{JXZH_FSXH},
+			JXZH_FSAZWZ=#{JXZH_FSAZWZ},
+			TMMT_FWBXGXMT=#{TMMT_FWBXGXMT},
+			TMMT_PTDMT=#{TMMT_PTDMT},
+			TMMT_PTJMBXGTM=#{TMMT_PTJMBXGTM},
+			TMMT_SCTMMT=#{TMMT_SCTMMT},
+			TMMT_SCSBH=#{TMMT_SCSBH},
+			TMMT_FSCTMMT=#{TMMT_FSCTMMT},
+			TMMT_FSCSBH=#{TMMT_FSCSBH},
+			TMXHZZ_TWZHLX=#{TMXHZZ_TWZHLX},
+			TMXHZZ_TWZHXH=#{TMXHZZ_TWZHXH},
+			TMXHZZ_XS=#{TMXHZZ_XS},
+			TMXHZZ_AN=#{TMXHZZ_AN},
+			TMXHZZ_CZ=#{TMXHZZ_CZ},
+			TMXHZZ_ZDJC=#{TMXHZZ_ZDJC},
+			TMXHZZ_MCGS=#{TMXHZZ_MCGS},
+			TMXHZZ_FJSM=#{TMXHZZ_FJSM},
+			TMXHZZ_WZYCOPMWAN=#{TMXHZZ_WZYCOPMWAN},
+			CZP_CZPLX=#{CZP_CZPLX},
+			CZP_CZPXH=#{CZP_CZPXH},
+			CZP_XS=#{CZP_XS},
+			CZP_AN=#{CZP_AN},
+			CZP_CZ=#{CZP_CZ},
+			CZP_CZPWZ=#{CZP_CZPWZ},
+			CZP_XS_SUB=#{CZP_XS_SUB},
+			UNSTD=#{UNSTD}
+		WHERE
+			FEIYANGMRL_ID=#{FEIYANGMRL_ID}
+	</update>
+	
+	<insert id="saveBjc" parameterType="pd">
+		INSERT INTO TB_BJC(
+			BJC_ID,
+			BJC_ZHJ,
+			BJC_SBJ,
+			BJC_ZK,
+			BJC_ZHSBJ,
+			BJC_AZF,
+			BJC_YSF,
+			BJC_SJBJ,
+			BJC_SL,
+			BJC_ZZ,
+			BJC_SD,
+			BJC_C,
+			BJC_Z,
+			BJC_M,
+			BJC_TSGD,
+			BJC_COD_ID,
+			BJC_ITEM_ID,
+			BJC_ELEV,
+			BJC_MODELS
+		)VALUES(
+			#{BJC_ID},
+			#{BJC_ZHJ},
+			#{BJC_SBJ},
+			#{BJC_ZK},
+			#{BJC_ZHSBJ},
+			#{BJC_AZF},
+			#{BJC_YSF},
+			#{BJC_SJBJ},
+			#{BJC_SL},
+			#{BJC_ZZ},
+			#{BJC_SD},
+			#{BJC_C},
+			#{BJC_Z},
+			#{BJC_M},
+			#{BJC_TSGD},
+			#{BJC_COD_ID},
+			#{BJC_ITEM_ID},
+			#{BJC_ELEV},
+			#{BJC_MODELS}	
+		)
+	</insert>
+	
+	<!-- 飞扬3000有机房保存 -->
+	<insert id="saveFeiyang" parameterType="pd">
+		INSERT INTO TB_FEIYANG(
+			FEIYANG_ID,
+			FEIYANG_AZF,
+			FEIYANG_YSF,
+			FEIYANG_SL,
+			FEIYANG_ZK,
+			FEIYANG_ZHJ,
+			FEIYANG_SBJ,
+			FEIYANG_ZHSBJ,
+			FEIYANG_SJBJ,
+			ELEV_IDS,
+			ITEM_ID,
+			MODELS_ID,
+			BZ_ZZ,
+			BZ_SD,
+			BZ_KMXS,
+			BZ_KMKD,
+			BZ_C,
+			BZ_Z,
+			BZ_M,
+			BASE_KZXT,
+			BASE_KZFS,
+			BASE_YYZJ,
+			BASE_JDJG,
+			BASE_QGLJJ,
+			BASE_JXGG,
+			BASE_JXGD,
+			BASE_KMCC,
+			BASE_MLXMBH,
+			BASE_JDCZQHD,
+			BASE_JDK,
+			BASE_JDS,
+			BASE_TSGD,
+			BASE_DKSD,
+			BASE_DCGD,
+			BASE_JDZG,
+			BASE_JZZT,
+			BASE_LCBJ,
+			BASE_DGZJ,
+			OPT_MWAN,
+			OPT_HJZDFHJZ,
+			OPT_XFYYX,
+			OPT_JXDZZ,
+			OPT_CCTVDL,
+			OPT_TDJJJY,
+			OPT_DJGRBH,
+			OPT_KQJHZZ,
+			OPT_NMYKJAN,
+			OPT_FDLCZ,
+			OPT_ZPC,
+			OPT_BAJK,
+			OPT_YYBZ,
+			OPT_QPGM,
+			OPT_DLFW,
+			OPT_KMBC,
+			OPT_DZYX,
+			OPT_NLHK,
+			OPT_YCJK,
+			OPT_ICK,
+			OPT_ICKZKSB,
+			OPT_ICKKP,
+			OPT_PTDTKT,
+			OPT_ZYFTSDTKT,
+			OPT_JKGM,
+			OPT_JKYYJ,
+			OPT_GTMJXJMBF,
+			OPT_GTMTMBF,
+			OPT_GTMS,
+			OPT_CMZH,
+			OPT_JFGT,
+			OPT_DJT,
+			DZJKSDJXT_DJTXFS,
+			DZJKSDJXT_DJTS,
+			JXZH_JM,
+			JXZH_JMSBH,
+			JXZH_JMZH,
+			JXZH_JXZH,
+			JXZH_QWB,
+			JXZH_QWBSBH,
+			JXZH_CWB,
+			JXZH_CWBSBH,
+			JXZH_HWB,
+			JXZH_HWBSBH,
+			JXZH_JDZH,
+			JXZH_ZSDD,
+			JXZH_AQC,
+			JXZH_BGJ,
+			JXZH_DBXH,
+			JXZH_DBZXHD,
+			JXZH_YLZHZL,
+			JXZH_FSXH,
+			JXZH_FSAZWZ,
+			TMMT_FWBXGXMT,
+			TMMT_PTDMT,
+			TMMT_PTJMBXGTM,
+			TMMT_SCTMMT,
+			TMMT_SCSBH,
+			TMMT_FSCTMMT,
+			TMMT_FSCSBH,
+			TMXHZZ_TWZHLX,
+			TMXHZZ_TWZHXH,
+			TMXHZZ_XS,
+			TMXHZZ_AN,
+			TMXHZZ_CZ,
+			TMXHZZ_ZDJC,
+			TMXHZZ_MCGS,
+			TMXHZZ_FJSM,
+			TMXHZZ_WZYCOPMWAN,
+			CZP_CZPLX,
+			CZP_CZPXH,
+			CZP_XS,
+			CZP_AN,
+			CZP_CZ,
+			CZP_CZPWZ,
+			CZP_XS_SUB,
+			UNSTD
+		)VALUES(
+			#{FEIYANG_ID},
+			#{FEIYANG_AZF},
+			#{FEIYANG_YSF},
+			#{FEIYANG_SL},
+			#{FEIYANG_ZK},
+			#{FEIYANG_ZHJ},
+			#{FEIYANG_SBJ},
+			#{FEIYANG_ZHSBJ},
+			#{FEIYANG_SJBJ},
+			#{ELEV_IDS},
+			#{ITEM_ID},
+			#{MODELS_ID},
+			#{BZ_ZZ},
+			#{BZ_SD},
+			#{BZ_KMXS},
+			#{BZ_KMKD},
+			#{BZ_C},
+			#{BZ_Z},
+			#{BZ_M},
+			#{BASE_KZXT},
+			#{BASE_KZFS},
+			#{BASE_YYZJ},
+			#{BASE_JDJG},
+			#{BASE_QGLJJ},
+			#{BASE_JXGG},
+			#{BASE_JXGD},
+			#{BASE_KMCC},
+			#{BASE_MLXMBH},
+			#{BASE_JDCZQHD},
+			#{BASE_JDK},
+			#{BASE_JDS},
+			#{BASE_TSGD},
+			#{BASE_DKSD},
+			#{BASE_DCGD},
+			#{BASE_JDZG},
+			#{BASE_JZZT},
+			#{BASE_LCBJ},
+			#{BASE_DGZJ},
+			#{OPT_MWAN},
+			#{OPT_HJZDFHJZ},
+			#{OPT_XFYYX},
+			#{OPT_JXDZZ},
+			#{OPT_CCTVDL},
+			#{OPT_TDJJJY},
+			#{OPT_DJGRBH},
+			#{OPT_KQJHZZ},
+			#{OPT_NMYKJAN},
+			#{OPT_FDLCZ},
+			#{OPT_ZPC},
+			#{OPT_BAJK},
+			#{OPT_YYBZ},
+			#{OPT_QPGM},
+			#{OPT_DLFW},
+			#{OPT_KMBC},
+			#{OPT_DZYX},
+			#{OPT_NLHK},
+			#{OPT_YCJK},
+			#{OPT_ICK},
+			#{OPT_ICKZKSB},
+			#{OPT_ICKKP},
+			#{OPT_PTDTKT},
+			#{OPT_ZYFTSDTKT},
+			#{OPT_JKGM},
+			#{OPT_JKYYJ},
+			#{OPT_GTMJXJMBF},
+			#{OPT_GTMTMBF},
+			#{OPT_GTMS},
+			#{OPT_CMZH},
+			#{OPT_JFGT},
+			#{OPT_DJT},
+			#{DZJKSDJXT_DJTXFS},
+			#{DZJKSDJXT_DJTS},
+			#{JXZH_JM},
+			#{JXZH_JMSBH},
+			#{JXZH_JMZH},
+			#{JXZH_JXZH},
+			#{JXZH_QWB},
+			#{JXZH_QWBSBH},
+			#{JXZH_CWB},
+			#{JXZH_CWBSBH},
+			#{JXZH_HWB},
+			#{JXZH_HWBSBH},
+			#{JXZH_JDZH},
+			#{JXZH_ZSDD},
+			#{JXZH_AQC},
+			#{JXZH_BGJ},
+			#{JXZH_DBXH},
+			#{JXZH_DBZXHD},
+			#{JXZH_YLZHZL},
+			#{JXZH_FSXH},
+			#{JXZH_FSAZWZ},
+			#{TMMT_FWBXGXMT},
+			#{TMMT_PTDMT},
+			#{TMMT_PTJMBXGTM},
+			#{TMMT_SCTMMT},
+			#{TMMT_SCSBH},
+			#{TMMT_FSCTMMT},
+			#{TMMT_FSCSBH},
+			#{TMXHZZ_TWZHLX},
+			#{TMXHZZ_TWZHXH},
+			#{TMXHZZ_XS},
+			#{TMXHZZ_AN},
+			#{TMXHZZ_CZ},
+			#{TMXHZZ_ZDJC},
+			#{TMXHZZ_MCGS},
+			#{TMXHZZ_FJSM},
+			#{TMXHZZ_WZYCOPMWAN},
+			#{CZP_CZPLX},
+			#{CZP_CZPXH},
+			#{CZP_XS},
+			#{CZP_AN},
+			#{CZP_CZ},
+			#{CZP_CZPWZ},
+			#{CZP_XS_SUB},
+			#{UNSTD}
+		)
+	</insert>
+	
+	<!-- feiyang编辑 -->
+	<update id="updateFeiyang" parameterType="pd">
+		UPDATE TB_FEIYANG SET
+			FEIYANG_AZF=#{FEIYANG_AZF},
+			FEIYANG_YSF=#{FEIYANG_YSF},
+			FEIYANG_SL=#{FEIYANG_SL},
+			FEIYANG_ZK=#{FEIYANG_ZK},
+			FEIYANG_ZHJ=#{FEIYANG_ZHJ},
+			FEIYANG_SBJ=#{FEIYANG_SBJ},
+			FEIYANG_ZHSBJ=#{FEIYANG_ZHSBJ},
+			FEIYANG_SJBJ=#{FEIYANG_SJBJ},
+			ELEV_IDS=#{ELEV_IDS},
+			ITEM_ID=#{ITEM_ID},
+			MODELS_ID=#{MODELS_ID},
+			BZ_ZZ=#{BZ_ZZ},
+			BZ_SD=#{BZ_SD},
+			BZ_KMXS=#{BZ_KMXS},
+			BZ_KMKD=#{BZ_KMKD},
+			BZ_C=#{BZ_C},
+			BZ_Z=#{BZ_Z},
+			BZ_M=#{BZ_M},
+			BASE_KZXT=#{BASE_KZXT},
+			BASE_KZFS=#{BASE_KZFS},
+			BASE_YYZJ=#{BASE_YYZJ},
+			BASE_JDJG=#{BASE_JDJG},
+			BASE_QGLJJ=#{BASE_QGLJJ},
+			BASE_JXGG=#{BASE_JXGG},
+			BASE_JXGD=#{BASE_JXGD},
+			BASE_KMCC=#{BASE_KMCC},
+			BASE_MLXMBH=#{BASE_MLXMBH},
+			BASE_JDCZQHD=#{BASE_JDCZQHD},
+			BASE_JDK=#{BASE_JDK},
+			BASE_JDS=#{BASE_JDS},
+			BASE_TSGD=#{BASE_TSGD},
+			BASE_DKSD=#{BASE_DKSD},
+			BASE_DCGD=#{BASE_DCGD},
+			BASE_JDZG=#{BASE_JDZG},
+			BASE_JZZT=#{BASE_JZZT},
+			BASE_LCBJ=#{BASE_LCBJ},
+			BASE_DGZJ=#{BASE_DGZJ},
+			OPT_MWAN=#{OPT_MWAN},
+			OPT_HJZDFHJZ=#{OPT_HJZDFHJZ},
+			OPT_XFYYX=#{OPT_XFYYX},
+			OPT_JXDZZ=#{OPT_JXDZZ},
+			OPT_CCTVDL=#{OPT_CCTVDL},
+			OPT_TDJJJY=#{OPT_TDJJJY},
+			OPT_DJGRBH=#{OPT_DJGRBH},
+			OPT_KQJHZZ=#{OPT_KQJHZZ},
+			OPT_NMYKJAN=#{OPT_NMYKJAN},
+			OPT_FDLCZ=#{OPT_FDLCZ},
+			OPT_ZPC=#{OPT_ZPC},
+			OPT_BAJK=#{OPT_BAJK},
+			OPT_YYBZ=#{OPT_YYBZ},
+			OPT_QPGM=#{OPT_QPGM},
+			OPT_DLFW=#{OPT_DLFW},
+			OPT_KMBC=#{OPT_KMBC},
+			OPT_DZYX=#{OPT_DZYX},
+			OPT_NLHK=#{OPT_NLHK},
+			OPT_YCJK=#{OPT_YCJK},
+			OPT_ICK=#{OPT_ICK},
+			OPT_ICKZKSB=#{OPT_ICKZKSB},
+			OPT_ICKKP=#{OPT_ICKKP},
+			OPT_PTDTKT=#{OPT_PTDTKT},
+			OPT_ZYFTSDTKT=#{OPT_ZYFTSDTKT},
+			OPT_JKGM=#{OPT_JKGM},
+			OPT_JKYYJ=#{OPT_JKYYJ},
+			OPT_GTMJXJMBF=#{OPT_GTMJXJMBF},
+			OPT_GTMTMBF=#{OPT_GTMTMBF},
+			OPT_GTMS=#{OPT_GTMS},
+			OPT_CMZH=#{OPT_CMZH},
+			OPT_JFGT=#{OPT_JFGT},
+			OPT_DJT=#{OPT_DJT},
+			DZJKSDJXT_DJTXFS=#{DZJKSDJXT_DJTXFS},
+			DZJKSDJXT_DJTS=#{DZJKSDJXT_DJTS},
+			JXZH_JM=#{JXZH_JM},
+			JXZH_JMSBH=#{JXZH_JMSBH},
+			JXZH_JMZH=#{JXZH_JMZH},
+			JXZH_JXZH=#{JXZH_JXZH},
+			JXZH_QWB=#{JXZH_QWB},
+			JXZH_QWBSBH=#{JXZH_QWBSBH},
+			JXZH_CWB=#{JXZH_CWB},
+			JXZH_CWBSBH=#{JXZH_CWBSBH},
+			JXZH_HWB=#{JXZH_HWB},
+			JXZH_HWBSBH=#{JXZH_HWBSBH},
+			JXZH_JDZH=#{JXZH_JDZH},
+			JXZH_ZSDD=#{JXZH_ZSDD},
+			JXZH_AQC=#{JXZH_AQC},
+			JXZH_BGJ=#{JXZH_BGJ},
+			JXZH_DBXH=#{JXZH_DBXH},
+			JXZH_DBZXHD=#{JXZH_DBZXHD},
+			JXZH_YLZHZL=#{JXZH_YLZHZL},
+			JXZH_FSXH=#{JXZH_FSXH},
+			JXZH_FSAZWZ=#{JXZH_FSAZWZ},
+			TMMT_FWBXGXMT=#{TMMT_FWBXGXMT},
+			TMMT_PTDMT=#{TMMT_PTDMT},
+			TMMT_PTJMBXGTM=#{TMMT_PTJMBXGTM},
+			TMMT_SCTMMT=#{TMMT_SCTMMT},
+			TMMT_SCSBH=#{TMMT_SCSBH},
+			TMMT_FSCTMMT=#{TMMT_FSCTMMT},
+			TMMT_FSCSBH=#{TMMT_FSCSBH},
+			TMXHZZ_TWZHLX=#{TMXHZZ_TWZHLX},
+			TMXHZZ_TWZHXH=#{TMXHZZ_TWZHXH},
+			TMXHZZ_XS=#{TMXHZZ_XS},
+			TMXHZZ_AN=#{TMXHZZ_AN},
+			TMXHZZ_CZ=#{TMXHZZ_CZ},
+			TMXHZZ_ZDJC=#{TMXHZZ_ZDJC},
+			TMXHZZ_MCGS=#{TMXHZZ_MCGS},
+			TMXHZZ_FJSM=#{TMXHZZ_FJSM},
+			TMXHZZ_WZYCOPMWAN=#{TMXHZZ_WZYCOPMWAN},
+			CZP_CZPLX=#{CZP_CZPLX},
+			CZP_CZPXH=#{CZP_CZPXH},
+			CZP_XS=#{CZP_XS},
+			CZP_AN=#{CZP_AN},
+			CZP_CZ=#{CZP_CZ},
+			CZP_CZPWZ=#{CZP_CZPWZ},
+			CZP_XS_SUB=#{CZP_XS_SUB},
+			UNSTD=#{UNSTD}
+		WHERE
+			FEIYANG_ID=#{FEIYANG_ID}
+	</update>
+
+	<!-- 飞扬消防梯梯保存 -->
+	<insert id="saveFeiyangXF" parameterType="pd">
+		INSERT INTO TB_FEIYANG_XF(
+			FEIYANGXF_ID,
+			FEIYANGXF_AZF,
+			FEIYANGXF_YSF,
+			FEIYANGXF_SL,
+			FEIYANGXF_ZK,
+			FEIYANGXF_ZHJ,
+			FEIYANGXF_SBJ,
+			FEIYANGXF_ZHSBJ,
+			FEIYANGXF_SJBJ,
+			ELEV_IDS,
+			ITEM_ID,
+			MODELS_ID,
+			BZ_ZZ,
+			BZ_SD,
+			BZ_KMXS,
+			BZ_KMKD,
+			BZ_C,
+			BZ_Z,
+			BZ_M,
+			BASE_KZXT,
+			BASE_KZFS,
+			BASE_JDJG,
+			BASE_QGLJJ,
+			BASE_JXGG,
+			BASE_JXGD,
+			BASE_KMCC,
+			BASE_MLXMBH,
+			BASE_JDCZQHD,
+			BASE_JDK,
+			BASE_JDS,
+			BASE_TSGD,
+			BASE_DKSD,
+			BASE_DCGD,
+			BASE_JDZG,
+			BASE_JZZT,
+			BASE_LCBJ,
+			BASE_DGZJ,
+			OPT_MWAN,
+			OPT_JXDZZ,
+			OPT_CCTVDL,
+			OPT_TDJJJY,
+			OPT_DJGRBH,
+			OPT_KQJHZZ,
+			OPT_NMYKJAN,
+			OPT_FDLCZ,
+			OPT_ZPC,
+			OPT_BAJK,
+			OPT_YYBZ,
+			OPT_QPGM,
+			OPT_DLFW,
+			OPT_KMBC,
+			OPT_DZYX,
+			OPT_NLHK,
+			OPT_YCJK,
+			OPT_ICK,
+			OPT_ICKZKSB,
+			OPT_ICKKP,
+			OPT_PTDTKT,
+			OPT_ZYFTSDTKT,
+			OPT_JKGM,
+			OPT_JKYYJ,
+			OPT_GTMJXJMBF,
+			OPT_GTMTMBF,
+			OPT_GTMS,
+			OPT_CMZH,
+			DZJKSDJXT_DJTXFS,
+			DZJKSDJXT_DJTS,
+			JXZH_JM,
+			JXZH_JMSBH,
+			JXZH_JMZH,
+			JXZH_JXZH,
+			JXZH_QWB,
+			JXZH_QWBSBH,
+			JXZH_CWB,
+			JXZH_CWBSBH,
+			JXZH_HWB,
+			JXZH_HWBSBH,
+			JXZH_JDZH,
+			JXZH_ZSDD,
+			JXZH_BGJ,
+			JXZH_DBXH,
+			JXZH_DBZXHD,
+			JXZH_YLZHZL,
+			JXZH_FSXH,
+			JXZH_FSAZWZ,
+			TMMT_JZBXGXMT,
+			TMMT_PTDMT,
+			TMMT_PTJMBXGTM,
+			TMMT_SCTMMT,
+			TMMT_SCSBH,
+			TMMT_FSCTMMT,
+			TMMT_FSCSBH,
+			TMXHZZ_TWZHLX,
+			TMXHZZ_TWZHXH,
+			TMXHZZ_XS,
+			TMXHZZ_AN,
+			TMXHZZ_CZ,
+			TMXHZZ_ZDJC,
+			TMXHZZ_MCGS,
+			TMXHZZ_FJSM,
+			TMXHZZ_WZYCOPMWAN,
+			CZP_CZPLX,
+			CZP_CZPXH,
+			CZP_XS,
+			CZP_AN,
+			CZP_CZ,
+			CZP_CZPWZ,
+			CZP_XS_SUB,
+			UNSTD
+		)VALUES(
+			#{FEIYANGXF_ID},
+			#{FEIYANGXF_AZF},
+			#{FEIYANGXF_YSF},
+			#{FEIYANGXF_SL},
+			#{FEIYANGXF_ZK},
+			#{FEIYANGXF_ZHJ},
+			#{FEIYANGXF_SBJ},
+			#{FEIYANGXF_ZHSBJ},
+			#{FEIYANGXF_SJBJ},
+			#{ELEV_IDS},
+			#{ITEM_ID},
+			#{MODELS_ID},
+			#{BZ_ZZ},
+			#{BZ_SD},
+			#{BZ_KMXS},
+			#{BZ_KMKD},
+			#{BZ_C},
+			#{BZ_Z},
+			#{BZ_M},
+			#{BASE_KZXT},
+			#{BASE_KZFS},
+			#{BASE_JDJG},
+			#{BASE_QGLJJ},
+			#{BASE_JXGG},
+			#{BASE_JXGD},
+			#{BASE_KMCC},
+			#{BASE_MLXMBH},
+			#{BASE_JDCZQHD},
+			#{BASE_JDK},
+			#{BASE_JDS},
+			#{BASE_TSGD},
+			#{BASE_DKSD},
+			#{BASE_DCGD},
+			#{BASE_JDZG},
+			#{BASE_JZZT},
+			#{BASE_LCBJ},
+			#{BASE_DGZJ},
+			#{OPT_MWAN},
+			#{OPT_JXDZZ},
+			#{OPT_CCTVDL},
+			#{OPT_TDJJJY},
+			#{OPT_DJGRBH},
+			#{OPT_KQJHZZ},
+			#{OPT_NMYKJAN},
+			#{OPT_FDLCZ},
+			#{OPT_ZPC},
+			#{OPT_BAJK},
+			#{OPT_YYBZ},
+			#{OPT_QPGM},
+			#{OPT_DLFW},
+			#{OPT_KMBC},
+			#{OPT_DZYX},
+			#{OPT_NLHK},
+			#{OPT_YCJK},
+			#{OPT_ICK},
+			#{OPT_ICKZKSB},
+			#{OPT_ICKKP},
+			#{OPT_PTDTKT},
+			#{OPT_ZYFTSDTKT},
+			#{OPT_JKGM},
+			#{OPT_JKYYJ},
+			#{OPT_GTMJXJMBF},
+			#{OPT_GTMTMBF},
+			#{OPT_GTMS},
+			#{OPT_CMZH},
+			#{DZJKSDJXT_DJTXFS},
+			#{DZJKSDJXT_DJTS},
+			#{JXZH_JM},
+			#{JXZH_JMSBH},
+			#{JXZH_JMZH},
+			#{JXZH_JXZH},
+			#{JXZH_QWB},
+			#{JXZH_QWBSBH},
+			#{JXZH_CWB},
+			#{JXZH_CWBSBH},
+			#{JXZH_HWB},
+			#{JXZH_HWBSBH},
+			#{JXZH_JDZH},
+			#{JXZH_ZSDD},
+			#{JXZH_BGJ},
+			#{JXZH_DBXH},
+			#{JXZH_DBZXHD},
+			#{JXZH_YLZHZL},
+			#{JXZH_FSXH},
+			#{JXZH_FSAZWZ},
+			#{TMMT_JZBXGXMT},
+			#{TMMT_PTDMT},
+			#{TMMT_PTJMBXGTM},
+			#{TMMT_SCTMMT},
+			#{TMMT_SCSBH},
+			#{TMMT_FSCTMMT},
+			#{TMMT_FSCSBH},
+			#{TMXHZZ_TWZHLX},
+			#{TMXHZZ_TWZHXH},
+			#{TMXHZZ_XS},
+			#{TMXHZZ_AN},
+			#{TMXHZZ_CZ},
+			#{TMXHZZ_ZDJC},
+			#{TMXHZZ_MCGS},
+			#{TMXHZZ_FJSM},
+			#{TMXHZZ_WZYCOPMWAN},
+			#{CZP_CZPLX},
+			#{CZP_CZPXH},
+			#{CZP_XS},
+			#{CZP_AN},
+			#{CZP_CZ},
+			#{CZP_CZPWZ},
+			#{CZP_XS_SUB},
+			#{UNSTD}
+		)
+	</insert>
+	
+	<!-- feiyangxf编辑 -->
+	<update id="updateFeiyangXF" parameterType="pd">
+		UPDATE TB_FEIYANG_XF SET
+			FEIYANGXF_AZF=#{FEIYANGXF_AZF},
+			FEIYANGXF_YSF=#{FEIYANGXF_YSF},
+			FEIYANGXF_SL=#{FEIYANGXF_SL},
+			FEIYANGXF_ZK=#{FEIYANGXF_ZK},
+			FEIYANGXF_ZHJ=#{FEIYANGXF_ZHJ},
+			FEIYANGXF_SBJ=#{FEIYANGXF_SBJ},
+			FEIYANGXF_ZHSBJ=#{FEIYANGXF_ZHSBJ},
+			FEIYANGXF_SJBJ=#{FEIYANGXF_SJBJ},
+			ELEV_IDS=#{ELEV_IDS},
+			ITEM_ID=#{ITEM_ID},
+			MODELS_ID=#{MODELS_ID},
+			BZ_ZZ=#{BZ_ZZ},
+			BZ_SD=#{BZ_SD},
+			BZ_KMXS=#{BZ_KMXS},
+			BZ_KMKD=#{BZ_KMKD},
+			BZ_C=#{BZ_C},
+			BZ_Z=#{BZ_Z},
+			BZ_M=#{BZ_M},
+			BASE_KZXT=#{BASE_KZXT},
+			BASE_KZFS=#{BASE_KZFS},
+			BASE_JDJG=#{BASE_JDJG},
+			BASE_QGLJJ=#{BASE_QGLJJ},
+			BASE_JXGG=#{BASE_JXGG},
+			BASE_JXGD=#{BASE_JXGD},
+			BASE_KMCC=#{BASE_KMCC},
+			BASE_MLXMBH=#{BASE_MLXMBH},
+			BASE_JDCZQHD=#{BASE_JDCZQHD},
+			BASE_JDK=#{BASE_JDK},
+			BASE_JDS=#{BASE_JDS},
+			BASE_TSGD=#{BASE_TSGD},
+			BASE_DKSD=#{BASE_DKSD},
+			BASE_DCGD=#{BASE_DCGD},
+			BASE_JDZG=#{BASE_JDZG},
+			BASE_JZZT=#{BASE_JZZT},
+			BASE_LCBJ=#{BASE_LCBJ},
+			BASE_DGZJ=#{BASE_DGZJ},
+			OPT_MWAN=#{OPT_MWAN},
+			OPT_JXDZZ=#{OPT_JXDZZ},
+			OPT_CCTVDL=#{OPT_CCTVDL},
+			OPT_TDJJJY=#{OPT_TDJJJY},
+			OPT_DJGRBH=#{OPT_DJGRBH},
+			OPT_KQJHZZ=#{OPT_KQJHZZ},
+			OPT_NMYKJAN=#{OPT_NMYKJAN},
+			OPT_FDLCZ=#{OPT_FDLCZ},
+			OPT_ZPC=#{OPT_ZPC},
+			OPT_BAJK=#{OPT_BAJK},
+			OPT_YYBZ=#{OPT_YYBZ},
+			OPT_QPGM=#{OPT_QPGM},
+			OPT_DLFW=#{OPT_DLFW},
+			OPT_KMBC=#{OPT_KMBC},
+			OPT_DZYX=#{OPT_DZYX},
+			OPT_NLHK=#{OPT_NLHK},
+			OPT_YCJK=#{OPT_YCJK},
+			OPT_ICK=#{OPT_ICK},
+			OPT_ICKZKSB=#{OPT_ICKZKSB},
+			OPT_ICKKP=#{OPT_ICKKP},
+			OPT_PTDTKT=#{OPT_PTDTKT},
+			OPT_ZYFTSDTKT=#{OPT_ZYFTSDTKT},
+			OPT_JKGM=#{OPT_JKGM},
+			OPT_JKYYJ=#{OPT_JKYYJ},
+			OPT_GTMJXJMBF=#{OPT_GTMJXJMBF},
+			OPT_GTMTMBF=#{OPT_GTMTMBF},
+			OPT_GTMS=#{OPT_GTMS},
+			OPT_CMZH=#{OPT_CMZH},
+			DZJKSDJXT_DJTXFS=#{DZJKSDJXT_DJTXFS},
+			DZJKSDJXT_DJTS=#{DZJKSDJXT_DJTS},
+			JXZH_JM=#{JXZH_JM},
+			JXZH_JMSBH=#{JXZH_JMSBH},
+			JXZH_JMZH=#{JXZH_JMZH},
+			JXZH_JXZH=#{JXZH_JXZH},
+			JXZH_QWB=#{JXZH_QWB},
+			JXZH_QWBSBH=#{JXZH_QWBSBH},
+			JXZH_CWB=#{JXZH_CWB},
+			JXZH_CWBSBH=#{JXZH_CWBSBH},
+			JXZH_HWB=#{JXZH_HWB},
+			JXZH_HWBSBH=#{JXZH_HWBSBH},
+			JXZH_JDZH=#{JXZH_JDZH},
+			JXZH_ZSDD=#{JXZH_ZSDD},
+			JXZH_BGJ=#{JXZH_BGJ},
+			JXZH_DBXH=#{JXZH_DBXH},
+			JXZH_DBZXHD=#{JXZH_DBZXHD},
+			JXZH_YLZHZL=#{JXZH_YLZHZL},
+			JXZH_FSXH=#{JXZH_FSXH},
+			JXZH_FSAZWZ=#{JXZH_FSAZWZ},
+			TMMT_JZBXGXMT=#{TMMT_JZBXGXMT},
+			TMMT_PTDMT=#{TMMT_PTDMT},
+			TMMT_PTJMBXGTM=#{TMMT_PTJMBXGTM},
+			TMMT_SCTMMT=#{TMMT_SCTMMT},
+			TMMT_SCSBH=#{TMMT_SCSBH},
+			TMMT_FSCTMMT=#{TMMT_FSCTMMT},
+			TMMT_FSCSBH=#{TMMT_FSCSBH},
+			TMXHZZ_TWZHLX=#{TMXHZZ_TWZHLX},
+			TMXHZZ_TWZHXH=#{TMXHZZ_TWZHXH},
+			TMXHZZ_XS=#{TMXHZZ_XS},
+			TMXHZZ_AN=#{TMXHZZ_AN},
+			TMXHZZ_CZ=#{TMXHZZ_CZ},
+			TMXHZZ_ZDJC=#{TMXHZZ_ZDJC},
+			TMXHZZ_MCGS=#{TMXHZZ_MCGS},
+			TMXHZZ_FJSM=#{TMXHZZ_FJSM},
+			TMXHZZ_WZYCOPMWAN=#{TMXHZZ_WZYCOPMWAN},
+			CZP_CZPLX=#{CZP_CZPLX},
+			CZP_CZPXH=#{CZP_CZPXH},
+			CZP_XS=#{CZP_XS},
+			CZP_AN=#{CZP_AN},
+			CZP_CZ=#{CZP_CZ},
+			CZP_CZPWZ=#{CZP_CZPWZ},
+			CZP_XS_SUB=#{CZP_XS_SUB},
+			UNSTD=#{UNSTD}
+		WHERE
+			FEIYANGXF_ID=#{FEIYANGXF_ID}
+	</update>
+	
+	<!-- 飞越梯保存 -->
+	<insert id="saveFeiyue" parameterType="pd">
+		INSERT INTO TB_FEIYUE(
+			FEIYUE_ID,
+			FEIYUE_AZF,
+			FEIYUE_YSF,
+			FEIYUE_SL,
+			FEIYUE_ZK,
+			FEIYUE_ZHJ,
+			FEIYUE_SBJ,
+			FEIYUE_ZHSBJ,
+			FEIYUE_SJBJ,
+			ELEV_IDS,
+			ITEM_ID,
+			MODELS_ID,
+			BZ_ZZ,
+			BZ_SD,
+			BZ_KMXS,
+			BZ_KMKD,
+			BZ_C,
+			BZ_Z,
+			BZ_M,
+			BASE_KZXT,
+			BASE_KZFS,
+			BASE_HTDM,
+			BASE_JDJG,
+			BASE_QGLJJ,
+			BASE_JXGG,
+			BASE_JXGD,
+			BASE_MLXMBH,
+			BASE_JDCZQHD,
+			BASE_JDK,
+			BASE_JDS,
+			BASE_TSGD,
+			BASE_DKSD,
+			BASE_DCGD,
+			BASE_JDZG,
+			BASE_JZZT,
+			BASE_LCBJ,
+			BASE_DGZJ,
+			OPT_LTBL,
+			OPT_TDJJJY,
+			OPT_JXDZZ,
+			OPT_SJCZ,
+			OPT_CCTVDL,
+			OPT_DJGRBH,
+			OPT_BAJK,
+			OPT_MBCAN,
+			OPT_KMZPC,
+			OPT_QPGM,
+			OPT_YCJK,
+			OPT_JFGT,
+			OPT_ICK,
+			OPT_ICKZKSB,
+			OPT_ICKKP,
+			OPT_GTMJXJMBF,
+			OPT_GTMTMBF,
+			OPT_GTMS,
+			DZJKSDJXT_DJTXFS,
+			DZJKSDJXT_DJTS,
+			JXZH_JM,
+			JXZH_JMSBH,
+			JXZH_JMZH,
+			JXZH_JXZH,
+			JXZH_QWB,
+			JXZH_QWBSBH,
+			JXZH_CWB,
+			JXZH_CWBSBH,
+			JXZH_HWB,
+			JXZH_HWBSBH,
+			JXZH_JDZH,
+			JXZH_ZSDD,
+			JXZH_AQC,
+			JXZH_BGJ,
+			JXZH_DBXH,
+			JXZH_DBZXHD,
+			JXZH_YLZHZL,
+			JXZH_FSXH,
+			JXZH_FSAZWZ,
+			TMMT_SCMK,
+			TMMT_SCMKCZ,
+			TMMT_SCMKGBSBH,
+			TMMT_QYCMK,
+			TMMT_QYCMKCZ,
+			TMMT_QYCMKGBSBH,
+			TMMT_SCTMCZ,
+			TMMT_SCTMGBSBH,
+			TMMT_QYCTMCZ,
+			TMMT_QYCTMGBSBH,
+			CZP_CZPLX,
+			CZP_CZPXH,
+			CZP_XS,
+			CZP_AN,
+			CZP_CZ,
+			CZP_CZPWZ,
+			TMXHZZ_TWZHLX,
+			TMXHZZ_TWZHXH,
+			TMXHZZ_XS,
+			TMXHZZ_AN,
+			TMXHZZ_CZ,
+			TMXHZZ_ZDJC,
+			TMXHZZ_MCGS,
+			TMXHZZ_FJSM,
+			TMXHZZ_GBSCJRCZX,
+			UNSTD
+		)VALUES(
+			#{FEIYUE_ID},
+			#{FEIYUE_AZF},
+			#{FEIYUE_YSF},
+			#{FEIYUE_SL},
+			#{FEIYUE_ZK},
+			#{FEIYUE_ZHJ},
+			#{FEIYUE_SBJ},
+			#{FEIYUE_ZHSBJ},
+			#{FEIYUE_SJBJ},
+			#{ELEV_IDS},
+			#{ITEM_ID},
+			#{MODELS_ID},
+			#{BZ_ZZ},
+			#{BZ_SD},
+			#{BZ_KMXS},
+			#{BZ_KMKD},
+			#{BZ_C},
+			#{BZ_Z},
+			#{BZ_M},
+			#{BASE_KZXT},
+			#{BASE_KZFS},
+			#{BASE_HTDM},
+			#{BASE_JDJG},
+			#{BASE_QGLJJ},
+			#{BASE_JXGG},
+			#{BASE_JXGD},
+			#{BASE_MLXMBH},
+			#{BASE_JDCZQHD},
+			#{BASE_JDK},
+			#{BASE_JDS},
+			#{BASE_TSGD},
+			#{BASE_DKSD},
+			#{BASE_DCGD},
+			#{BASE_JDZG},
+			#{BASE_JZZT},
+			#{BASE_LCBJ},
+			#{BASE_DGZJ},
+			#{OPT_LTBL},
+			#{OPT_TDJJJY},
+			#{OPT_JXDZZ},
+			#{OPT_SJCZ},
+			#{OPT_CCTVDL},
+			#{OPT_DJGRBH},
+			#{OPT_BAJK},
+			#{OPT_MBCAN},
+			#{OPT_KMZPC},
+			#{OPT_QPGM},
+			#{OPT_YCJK},
+			#{OPT_JFGT},
+			#{OPT_ICK},
+			#{OPT_ICKZKSB},
+			#{OPT_ICKKP},
+			#{OPT_GTMJXJMBF},
+			#{OPT_GTMTMBF},
+			#{OPT_GTMS},
+			#{DZJKSDJXT_DJTXFS},
+			#{DZJKSDJXT_DJTS},
+			#{JXZH_JM},
+			#{JXZH_JMSBH},
+			#{JXZH_JMZH},
+			#{JXZH_JXZH},
+			#{JXZH_QWB},
+			#{JXZH_QWBSBH},
+			#{JXZH_CWB},
+			#{JXZH_CWBSBH},
+			#{JXZH_HWB},
+			#{JXZH_HWBSBH},
+			#{JXZH_JDZH},
+			#{JXZH_ZSDD},
+			#{JXZH_AQC},
+			#{JXZH_BGJ},
+			#{JXZH_DBXH},
+			#{JXZH_DBZXHD},
+			#{JXZH_YLZHZL},
+			#{JXZH_FSXH},
+			#{JXZH_FSAZWZ},
+			#{TMMT_SCMK},
+			#{TMMT_SCMKCZ},
+			#{TMMT_SCMKGBSBH},
+			#{TMMT_QYCMK},
+			#{TMMT_QYCMKCZ},
+			#{TMMT_QYCMKGBSBH},
+			#{TMMT_SCTMCZ},
+			#{TMMT_SCTMGBSBH},
+			#{TMMT_QYCTMCZ},
+			#{TMMT_QYCTMGBSBH},
+			#{CZP_CZPLX},
+			#{CZP_CZPXH},
+			#{CZP_XS},
+			#{CZP_AN},
+			#{CZP_CZ},
+			#{CZP_CZPWZ},
+			#{TMXHZZ_TWZHLX},
+			#{TMXHZZ_TWZHXH},
+			#{TMXHZZ_XS},
+			#{TMXHZZ_AN},
+			#{TMXHZZ_CZ},
+			#{TMXHZZ_ZDJC},
+			#{TMXHZZ_MCGS},
+			#{TMXHZZ_FJSM},
+			#{TMXHZZ_GBSCJRCZX},
+			#{UNSTD}
+		)
+	</insert>
+	
+	<!-- 编辑飞越 -->
+	<update id="updateFeiyue" parameterType="pd">
+		UPDATE TB_FEIYUE SET
+			FEIYUE_AZF=#{FEIYUE_AZF},
+			FEIYUE_YSF=#{FEIYUE_YSF},
+			FEIYUE_SL=#{FEIYUE_SL},
+			FEIYUE_ZK=#{FEIYUE_ZK},
+			FEIYUE_ZHJ=#{FEIYUE_ZHJ},
+			FEIYUE_SBJ=#{FEIYUE_SBJ},
+			FEIYUE_ZHSBJ=#{FEIYUE_ZHSBJ},
+			FEIYUE_SJBJ=#{FEIYUE_SJBJ},
+			ELEV_IDS=#{ELEV_IDS},
+			ITEM_ID=#{ITEM_ID},
+			MODELS_ID=#{MODELS_ID},
+			BZ_ZZ=#{BZ_ZZ},
+			BZ_SD=#{BZ_SD},
+			BZ_KMXS=#{BZ_KMXS},
+			BZ_KMKD=#{BZ_KMKD},
+			BZ_C=#{BZ_C},
+			BZ_Z=#{BZ_Z},
+			BZ_M=#{BZ_M},
+			BASE_KZXT=#{BASE_KZXT},
+			BASE_KZFS=#{BASE_KZFS},
+			BASE_HTDM=#{BASE_HTDM},
+			BASE_JDJG=#{BASE_JDJG},
+			BASE_QGLJJ=#{BASE_QGLJJ},
+			BASE_JXGG=#{BASE_JXGG},
+			BASE_JXGD=#{BASE_JXGD},
+			BASE_MLXMBH=#{BASE_MLXMBH},
+			BASE_JDCZQHD=#{BASE_JDCZQHD},
+			BASE_JDK=#{BASE_JDK},
+			BASE_JDS=#{BASE_JDS},
+			BASE_TSGD=#{BASE_TSGD},
+			BASE_DKSD=#{BASE_DKSD},
+			BASE_DCGD=#{BASE_DCGD},
+			BASE_JDZG=#{BASE_JDZG},
+			BASE_JZZT=#{BASE_JZZT},
+			BASE_LCBJ=#{BASE_LCBJ},
+			BASE_DGZJ=#{BASE_DGZJ},
+			OPT_LTBL=#{OPT_LTBL},
+			OPT_TDJJJY=#{OPT_TDJJJY},
+			OPT_JXDZZ=#{OPT_JXDZZ},
+			OPT_SJCZ=#{OPT_SJCZ},
+			OPT_CCTVDL=#{OPT_CCTVDL},
+			OPT_DJGRBH=#{OPT_DJGRBH},
+			OPT_BAJK=#{OPT_BAJK},
+			OPT_MBCAN=#{OPT_MBCAN},
+			OPT_KMZPC=#{OPT_KMZPC},
+			OPT_QPGM=#{OPT_QPGM},
+			OPT_YCJK=#{OPT_YCJK},
+			OPT_JFGT=#{OPT_JFGT},
+			OPT_ICK=#{OPT_ICK},
+			OPT_ICKZKSB=#{OPT_ICKZKSB},
+			OPT_ICKKP=#{OPT_ICKKP},
+			OPT_GTMJXJMBF=#{OPT_GTMJXJMBF},
+			OPT_GTMTMBF=#{OPT_GTMTMBF},
+			OPT_GTMS=#{OPT_GTMS},
+			DZJKSDJXT_DJTXFS=#{DZJKSDJXT_DJTXFS},
+			DZJKSDJXT_DJTS=#{DZJKSDJXT_DJTS},
+			JXZH_JM=#{JXZH_JM},
+			JXZH_JMSBH=#{JXZH_JMSBH},
+			JXZH_JMZH=#{JXZH_JMZH},
+			JXZH_JXZH=#{JXZH_JXZH},
+			JXZH_QWB=#{JXZH_QWB},
+			JXZH_QWBSBH=#{JXZH_QWBSBH},
+			JXZH_CWB=#{JXZH_CWB},
+			JXZH_CWBSBH=#{JXZH_CWBSBH},
+			JXZH_HWB=#{JXZH_HWB},
+			JXZH_HWBSBH=#{JXZH_HWBSBH},
+			JXZH_JDZH=#{JXZH_JDZH},
+			JXZH_ZSDD=#{JXZH_ZSDD},
+			JXZH_AQC=#{JXZH_AQC},
+			JXZH_BGJ=#{JXZH_BGJ},
+			JXZH_DBXH=#{JXZH_DBXH},
+			JXZH_DBZXHD=#{JXZH_DBZXHD},
+			JXZH_YLZHZL=#{JXZH_YLZHZL},
+			JXZH_FSXH=#{JXZH_FSXH},
+			JXZH_FSAZWZ=#{JXZH_FSAZWZ},
+			TMMT_SCMK=#{TMMT_SCMK},
+			TMMT_SCMKCZ=#{TMMT_SCMKCZ},
+			TMMT_SCMKGBSBH=#{TMMT_SCMKGBSBH},
+			TMMT_QYCMK=#{TMMT_QYCMK},
+			TMMT_QYCMKCZ=#{TMMT_QYCMKCZ},
+			TMMT_QYCMKGBSBH=#{TMMT_QYCMKGBSBH},
+			TMMT_SCTMCZ=#{TMMT_SCTMCZ},
+			TMMT_SCTMGBSBH=#{TMMT_SCTMGBSBH},
+			TMMT_QYCTMCZ=#{TMMT_QYCTMCZ},
+			TMMT_QYCTMGBSBH=#{TMMT_QYCTMGBSBH},
+			CZP_CZPLX=#{CZP_CZPLX},
+			CZP_CZPXH=#{CZP_CZPXH},
+			CZP_XS=#{CZP_XS},
+			CZP_AN=#{CZP_AN},
+			CZP_CZ=#{CZP_CZ},
+			CZP_CZPWZ=#{CZP_CZPWZ},
+			TMXHZZ_TWZHLX=#{TMXHZZ_TWZHLX},
+			TMXHZZ_TWZHXH=#{TMXHZZ_TWZHXH},
+			TMXHZZ_XS=#{TMXHZZ_XS},
+			TMXHZZ_AN=#{TMXHZZ_AN},
+			TMXHZZ_CZ=#{TMXHZZ_CZ},
+			TMXHZZ_ZDJC=#{TMXHZZ_ZDJC},
+			TMXHZZ_MCGS=#{TMXHZZ_MCGS},
+			TMXHZZ_FJSM=#{TMXHZZ_FJSM},
+			TMXHZZ_GBSCJRCZX=#{TMXHZZ_GBSCJRCZX},
+			UNSTD=#{UNSTD}
+		WHERE
+			FEIYUE_ID=#{FEIYUE_ID}
+	</update>
+	
+	<!-- 飞越梯保存 -->
+	<insert id="saveFeiyueMRL" parameterType="pd">
+		INSERT INTO TB_FEIYUE_MRL(
+			FEIYUEMRL_ID,
+			FEIYUEMRL_AZF,
+			FEIYUEMRL_YSF,
+			FEIYUEMRL_SL,
+			FEIYUEMRL_ZK,
+			FEIYUEMRL_ZHJ,
+			FEIYUEMRL_SBJ,
+			FEIYUEMRL_ZHSBJ,
+			FEIYUEMRL_SJBJ,
+			ELEV_IDS,
+			ITEM_ID,
+			MODELS_ID,
+			BZ_ZZ,
+			BZ_SD,
+			BZ_KMXS,
+			BZ_KMKD,
+			BZ_C,
+			BZ_Z,
+			BZ_M,
+			BASE_KZXT,
+			BASE_KZFS,
+			BASE_HTDM,
+			BASE_JDJG,
+			BASE_QGLJJ,
+			BASE_JXGG,
+			BASE_JXGD,
+			BASE_MLXMBH,
+			BASE_JDCZQHD,
+			BASE_JDK,
+			BASE_JDS,
+			BASE_TSGD,
+			BASE_DKSD,
+			BASE_DCGD,
+			BASE_JDZG,
+			BASE_JZZT,
+			BASE_LCBJ,
+			BASE_DGZJ,
+			OPT_LTBL,
+			OPT_TDJJJY,
+			OPT_JXDZZ,
+			OPT_SJCZ,
+			OPT_CCTVDL,
+			OPT_DJGRBH,
+			OPT_BAJK,
+			OPT_MBCAN,
+			OPT_KMZPC,
+			OPT_QPGM,
+			OPT_YCJK,
+			OPT_JFGT,
+			OPT_ICK,
+			OPT_ICKZKSB,
+			OPT_ICKKP,
+			OPT_GTMJXJMBF,
+			OPT_GTMTMBF,
+			OPT_GTMS,
+			DZJKSDJXT_DJTXFS,
+			DZJKSDJXT_DJTS,
+			JXZH_JM,
+			JXZH_JMSBH,
+			JXZH_JMZH,
+			JXZH_JXZH,
+			JXZH_QWB,
+			JXZH_QWBSBH,
+			JXZH_CWB,
+			JXZH_CWBSBH,
+			JXZH_HWB,
+			JXZH_HWBSBH,
+			JXZH_JDZH,
+			JXZH_ZSDD,
+			JXZH_AQC,
+			JXZH_BGJ,
+			JXZH_DBXH,
+			JXZH_DBZXHD,
+			JXZH_YLZHZL,
+			JXZH_FSXH,
+			JXZH_FSAZWZ,
+			TMMT_SCMK,
+			TMMT_SCMKCZ,
+			TMMT_SCMKGBSBH,
+			TMMT_QYCMK,
+			TMMT_QYCMKCZ,
+			TMMT_QYCMKGBSBH,
+			TMMT_SCTMCZ,
+			TMMT_SCTMGBSBH,
+			TMMT_QYCTMCZ,
+			TMMT_QYCTMGBSBH,
+			CZP_CZPLX,
+			CZP_CZPXH,
+			CZP_XS,
+			CZP_AN,
+			CZP_CZ,
+			CZP_CZPWZ,
+			TMXHZZ_TWZHLX,
+			TMXHZZ_TWZHXH,
+			TMXHZZ_XS,
+			TMXHZZ_AN,
+			TMXHZZ_CZ,
+			TMXHZZ_ZDJC,
+			TMXHZZ_MCGS,
+			TMXHZZ_FJSM,
+			TMXHZZ_GBSCJRCZX,
+			UNSTD
+		)VALUES(
+			#{FEIYUEMRL_ID},
+			#{FEIYUEMRL_AZF},
+			#{FEIYUEMRL_YSF},
+			#{FEIYUEMRL_SL},
+			#{FEIYUEMRL_ZK},
+			#{FEIYUEMRL_ZHJ},
+			#{FEIYUEMRL_SBJ},
+			#{FEIYUEMRL_ZHSBJ},
+			#{FEIYUEMRL_SJBJ},
+			#{ELEV_IDS},
+			#{ITEM_ID},
+			#{MODELS_ID},
+			#{BZ_ZZ},
+			#{BZ_SD},
+			#{BZ_KMXS},
+			#{BZ_KMKD},
+			#{BZ_C},
+			#{BZ_Z},
+			#{BZ_M},
+			#{BASE_KZXT},
+			#{BASE_KZFS},
+			#{BASE_HTDM},
+			#{BASE_JDJG},
+			#{BASE_QGLJJ},
+			#{BASE_JXGG},
+			#{BASE_JXGD},
+			#{BASE_MLXMBH},
+			#{BASE_JDCZQHD},
+			#{BASE_JDK},
+			#{BASE_JDS},
+			#{BASE_TSGD},
+			#{BASE_DKSD},
+			#{BASE_DCGD},
+			#{BASE_JDZG},
+			#{BASE_JZZT},
+			#{BASE_LCBJ},
+			#{BASE_DGZJ},
+			#{OPT_LTBL},
+			#{OPT_TDJJJY},
+			#{OPT_JXDZZ},
+			#{OPT_SJCZ},
+			#{OPT_CCTVDL},
+			#{OPT_DJGRBH},
+			#{OPT_BAJK},
+			#{OPT_MBCAN},
+			#{OPT_KMZPC},
+			#{OPT_QPGM},
+			#{OPT_YCJK},
+			#{OPT_JFGT},
+			#{OPT_ICK},
+			#{OPT_ICKZKSB},
+			#{OPT_ICKKP},
+			#{OPT_GTMJXJMBF},
+			#{OPT_GTMTMBF},
+			#{OPT_GTMS},
+			#{DZJKSDJXT_DJTXFS},
+			#{DZJKSDJXT_DJTS},
+			#{JXZH_JM},
+			#{JXZH_JMSBH},
+			#{JXZH_JMZH},
+			#{JXZH_JXZH},
+			#{JXZH_QWB},
+			#{JXZH_QWBSBH},
+			#{JXZH_CWB},
+			#{JXZH_CWBSBH},
+			#{JXZH_HWB},
+			#{JXZH_HWBSBH},
+			#{JXZH_JDZH},
+			#{JXZH_ZSDD},
+			#{JXZH_AQC},
+			#{JXZH_BGJ},
+			#{JXZH_DBXH},
+			#{JXZH_DBZXHD},
+			#{JXZH_YLZHZL},
+			#{JXZH_FSXH},
+			#{JXZH_FSAZWZ},
+			#{TMMT_SCMK},
+			#{TMMT_SCMKCZ},
+			#{TMMT_SCMKGBSBH},
+			#{TMMT_QYCMK},
+			#{TMMT_QYCMKCZ},
+			#{TMMT_QYCMKGBSBH},
+			#{TMMT_SCTMCZ},
+			#{TMMT_SCTMGBSBH},
+			#{TMMT_QYCTMCZ},
+			#{TMMT_QYCTMGBSBH},
+			#{CZP_CZPLX},
+			#{CZP_CZPXH},
+			#{CZP_XS},
+			#{CZP_AN},
+			#{CZP_CZ},
+			#{CZP_CZPWZ},
+			#{TMXHZZ_TWZHLX},
+			#{TMXHZZ_TWZHXH},
+			#{TMXHZZ_XS},
+			#{TMXHZZ_AN},
+			#{TMXHZZ_CZ},
+			#{TMXHZZ_ZDJC},
+			#{TMXHZZ_MCGS},
+			#{TMXHZZ_FJSM},
+			#{TMXHZZ_GBSCJRCZX},
+			#{UNSTD}
+		)
+	</insert>
+	
+	<!-- feiyuemrl编辑 -->
+	<update id="updateFeiyueMRL" parameterType="pd">
+		UPDATE TB_FEIYUE_MRL SET
+			FEIYUEMRL_AZF=#{FEIYUEMRL_AZF},
+			FEIYUEMRL_YSF=#{FEIYUEMRL_YSF},
+			FEIYUEMRL_SL=#{FEIYUEMRL_SL},
+			FEIYUEMRL_ZK=#{FEIYUEMRL_ZK},
+			FEIYUEMRL_ZHJ=#{FEIYUEMRL_ZHJ},
+			FEIYUEMRL_SBJ=#{FEIYUEMRL_SBJ},
+			FEIYUEMRL_ZHSBJ=#{FEIYUEMRL_ZHSBJ},
+			FEIYUEMRL_SJBJ=#{FEIYUEMRL_SJBJ},
+			ELEV_IDS=#{ELEV_IDS},
+			ITEM_ID=#{ITEM_ID},
+			MODELS_ID=#{MODELS_ID},
+			BZ_ZZ=#{BZ_ZZ},
+			BZ_SD=#{BZ_SD},
+			BZ_KMXS=#{BZ_KMXS},
+			BZ_KMKD=#{BZ_KMKD},
+			BZ_C=#{BZ_C},
+			BZ_Z=#{BZ_Z},
+			BZ_M=#{BZ_M},
+			BASE_KZXT=#{BASE_KZXT},
+			BASE_KZFS=#{BASE_KZFS},
+			BASE_HTDM=#{BASE_HTDM},
+			BASE_JDJG=#{BASE_JDJG},
+			BASE_QGLJJ=#{BASE_QGLJJ},
+			BASE_JXGG=#{BASE_JXGG},
+			BASE_JXGD=#{BASE_JXGD},
+			BASE_MLXMBH=#{BASE_MLXMBH},
+			BASE_JDCZQHD=#{BASE_JDCZQHD},
+			BASE_JDK=#{BASE_JDK},
+			BASE_JDS=#{BASE_JDS},
+			BASE_TSGD=#{BASE_TSGD},
+			BASE_DKSD=#{BASE_DKSD},
+			BASE_DCGD=#{BASE_DCGD},
+			BASE_JDZG=#{BASE_JDZG},
+			BASE_JZZT=#{BASE_JZZT},
+			BASE_LCBJ=#{BASE_LCBJ},
+			BASE_DGZJ=#{BASE_DGZJ},
+			OPT_LTBL=#{OPT_LTBL},
+			OPT_TDJJJY=#{OPT_TDJJJY},
+			OPT_JXDZZ=#{OPT_JXDZZ},
+			OPT_SJCZ=#{OPT_SJCZ},
+			OPT_CCTVDL=#{OPT_CCTVDL},
+			OPT_DJGRBH=#{OPT_DJGRBH},
+			OPT_BAJK=#{OPT_BAJK},
+			OPT_MBCAN=#{OPT_MBCAN},
+			OPT_KMZPC=#{OPT_KMZPC},
+			OPT_QPGM=#{OPT_QPGM},
+			OPT_YCJK=#{OPT_YCJK},
+			OPT_JFGT=#{OPT_JFGT},
+			OPT_ICK=#{OPT_ICK},
+			OPT_ICKZKSB=#{OPT_ICKZKSB},
+			OPT_ICKKP=#{OPT_ICKKP},
+			OPT_GTMJXJMBF=#{OPT_GTMJXJMBF},
+			OPT_GTMTMBF=#{OPT_GTMTMBF},
+			OPT_GTMS=#{OPT_GTMS},
+			DZJKSDJXT_DJTXFS=#{DZJKSDJXT_DJTXFS},
+			DZJKSDJXT_DJTS=#{DZJKSDJXT_DJTS},
+			JXZH_JM=#{JXZH_JM},
+			JXZH_JMSBH=#{JXZH_JMSBH},
+			JXZH_JMZH=#{JXZH_JMZH},
+			JXZH_JXZH=#{JXZH_JXZH},
+			JXZH_QWB=#{JXZH_QWB},
+			JXZH_QWBSBH=#{JXZH_QWBSBH},
+			JXZH_CWB=#{JXZH_CWB},
+			JXZH_CWBSBH=#{JXZH_CWBSBH},
+			JXZH_HWB=#{JXZH_HWB},
+			JXZH_HWBSBH=#{JXZH_HWBSBH},
+			JXZH_JDZH=#{JXZH_JDZH},
+			JXZH_ZSDD=#{JXZH_ZSDD},
+			JXZH_AQC=#{JXZH_AQC},
+			JXZH_BGJ=#{JXZH_BGJ},
+			JXZH_DBXH=#{JXZH_DBXH},
+			JXZH_DBZXHD=#{JXZH_DBZXHD},
+			JXZH_YLZHZL=#{JXZH_YLZHZL},
+			JXZH_FSXH=#{JXZH_FSXH},
+			JXZH_FSAZWZ=#{JXZH_FSAZWZ},
+			TMMT_SCMK=#{TMMT_SCMK},
+			TMMT_SCMKCZ=#{TMMT_SCMKCZ},
+			TMMT_SCMKGBSBH=#{TMMT_SCMKGBSBH},
+			TMMT_QYCMK=#{TMMT_QYCMK},
+			TMMT_QYCMKCZ=#{TMMT_QYCMKCZ},
+			TMMT_QYCMKGBSBH=#{TMMT_QYCMKGBSBH},
+			TMMT_SCTMCZ=#{TMMT_SCTMCZ},
+			TMMT_SCTMGBSBH=#{TMMT_SCTMGBSBH},
+			TMMT_QYCTMCZ=#{TMMT_QYCTMCZ},
+			TMMT_QYCTMGBSBH=#{TMMT_QYCTMGBSBH},
+			CZP_CZPLX=#{CZP_CZPLX},
+			CZP_CZPXH=#{CZP_CZPXH},
+			CZP_XS=#{CZP_XS},
+			CZP_AN=#{CZP_AN},
+			CZP_CZ=#{CZP_CZ},
+			CZP_CZPWZ=#{CZP_CZPWZ},
+			TMXHZZ_TWZHLX=#{TMXHZZ_TWZHLX},
+			TMXHZZ_TWZHXH=#{TMXHZZ_TWZHXH},
+			TMXHZZ_XS=#{TMXHZZ_XS},
+			TMXHZZ_AN=#{TMXHZZ_AN},
+			TMXHZZ_CZ=#{TMXHZZ_CZ},
+			TMXHZZ_ZDJC=#{TMXHZZ_ZDJC},
+			TMXHZZ_MCGS=#{TMXHZZ_MCGS},
+			TMXHZZ_FJSM=#{TMXHZZ_FJSM},
+			TMXHZZ_GBSCJRCZX=#{TMXHZZ_GBSCJRCZX},
+			UNSTD=#{UNSTD}
+		WHERE
+			FEIYUEMRL_ID=#{FEIYUEMRL_ID}
+	</update>
+	
+	<!-- 扶梯保存 -->
+	<insert id="saveDnp9300" parameterType="pd">
+		INSERT INTO TB_DNP9300(
+			DNP9300_ID,
+			DNP9300_AZF,
+			DNP9300_YSF,
+			DNP9300_SL,
+			DNP9300_ZK,
+			DNP9300_ZHJ,
+			DNP9300_SBJ,
+			DNP9300_ZHSBJ,
+			DNP9300_SJBJ,
+			ELEV_IDS,
+			ITEM_ID,
+			MODELS_ID,
+			BZ_SD,
+			BZ_GG,
+			BZ_TSGD,
+			BZ_TJKD,
+			BZ_QXJD,
+			BZ_SPTJ,
+			BASE_SPKJ,
+			BASE_DY,
+			BASE_AZHJ,
+			BASE_FSLX,
+			BASE_FSGD,
+			BASE_ZJZCSL,
+			BASE_BZXS,
+			BASE_SDJC,
+			BASE_XDJC,
+			BASE_YSFS,
+			BASE_JHXT,
+			PART_JSJ,
+			PART_TJLX,
+			PART_TJYS,
+			PART_TJZFX,
+			PART_TJBKCZ,
+			PART_FSDGCZ,
+			PART_FSDGG,
+			PART_FSDYS,
+			PART_WQBCZ,
+			PART_NWGBCZ,
+			PART_SCTBJHDGB,
+			PART_SCB,
+			PART_QDFS,
+			OPT_ANZDQ,
+			OPT_JTLXD,
+			OPT_ZDJY,
+			OPT_QDLLZ,
+			OPT_LEDWQZM,
+			OPT_TJFTBH,
+			OPT_FSDDDBHZZ,
+			OPT_ZDWQJXKG,
+			OPT_SCZM,
+			OPT_YSFLQ,
+			OPT_FHBH,
+			OPT_TJLFHZ,
+			OPT_WXHLTS,
+			OPT_FPZZ,
+			OPT_HJFDDS,
+			OPT_GCD,
+			OPT_ZDQMSJK,
+			OPT_DZGSS,
+			OPT_HJJR,
+			OPT_SCJR,
+			OPT_FSJR,
+			OPT_WZSWZ,
+			OPT_ZSBCL,
+			OPT_ZSBHD
+		)VALUES(
+			#{DNP9300_ID},
+			#{DNP9300_AZF},
+			#{DNP9300_YSF},
+			#{DNP9300_SL},
+			#{DNP9300_ZK},
+			#{DNP9300_ZHJ},
+			#{DNP9300_SBJ},
+			#{DNP9300_ZHSBJ},
+			#{DNP9300_SJBJ},
+			#{ELEV_IDS},
+			#{ITEM_ID},
+			#{MODELS_ID},
+			#{BZ_SD},
+			#{BZ_GG},
+			#{BZ_TSGD},
+			#{BZ_TJKD},
+			#{BZ_QXJD},
+			#{BZ_SPTJ},
+			#{BASE_SPKJ},
+			#{BASE_DY},
+			#{BASE_AZHJ},
+			#{BASE_FSLX},
+			#{BASE_FSGD},
+			#{BASE_ZJZCSL},
+			#{BASE_BZXS},
+			#{BASE_SDJC},
+			#{BASE_XDJC},
+			#{BASE_YSFS},
+			#{BASE_JHXT},
+			#{PART_JSJ},
+			#{PART_TJLX},
+			#{PART_TJYS},
+			#{PART_TJZFX},
+			#{PART_TJBKCZ},
+			#{PART_FSDGCZ},
+			#{PART_FSDGG},
+			#{PART_FSDYS},
+			#{PART_WQBCZ},
+			#{PART_NWGBCZ},
+			#{PART_SCTBJHDGB},
+			#{PART_SCB},
+			#{PART_QDFS},
+			#{OPT_ANZDQ},
+			#{OPT_JTLXD},
+			#{OPT_ZDJY},
+			#{OPT_QDLLZ},
+			#{OPT_LEDWQZM},
+			#{OPT_TJFTBH},
+			#{OPT_FSDDDBHZZ},
+			#{OPT_ZDWQJXKG},
+			#{OPT_SCZM},
+			#{OPT_YSFLQ},
+			#{OPT_FHBH},
+			#{OPT_TJLFHZ},
+			#{OPT_WXHLTS},
+			#{OPT_FPZZ},
+			#{OPT_HJFDDS},
+			#{OPT_GCD},
+			#{OPT_ZDQMSJK},
+			#{OPT_DZGSS},
+			#{OPT_HJJR},
+			#{OPT_SCJR},
+			#{OPT_FSJR},
+			#{OPT_WZSWZ},
+			#{OPT_ZSBCL},
+			#{OPT_ZSBHD}
+		)
+	</insert>
+	
+	<!-- 扶梯编辑 -->
+	<update id="updateDnp9300" parameterType="pd">
+		UPDATE TB_DNP9300 SET
+			DNP9300_AZF=#{DNP9300_AZF},
+			DNP9300_YSF=#{DNP9300_YSF},
+			DNP9300_SL=#{DNP9300_SL},
+			DNP9300_ZK=#{DNP9300_ZK},
+			DNP9300_ZHJ=#{DNP9300_ZHJ},
+			DNP9300_SBJ=#{DNP9300_SBJ},
+			DNP9300_ZHSBJ=#{DNP9300_ZHSBJ},
+			DNP9300_SJBJ=#{DNP9300_SJBJ},
+			ELEV_IDS=#{ELEV_IDS},
+			ITEM_ID=#{ITEM_ID},
+			MODELS_ID=#{MODELS_ID},
+			BZ_SD=#{BZ_SD},
+			BZ_GG=#{BZ_GG},
+			BZ_TSGD=#{BZ_TSGD},
+			BZ_TJKD=#{BZ_TJKD},
+			BZ_QXJD=#{BZ_QXJD},
+			BZ_SPTJ=#{BZ_SPTJ},
+			BASE_SPKJ=#{BASE_SPKJ},
+			BASE_DY=#{BASE_DY},
+			BASE_AZHJ=#{BASE_AZHJ},
+			BASE_FSLX=#{BASE_FSLX},
+			BASE_FSGD=#{BASE_FSGD},
+			BASE_ZJZCSL=#{BASE_ZJZCSL},
+			BASE_BZXS=#{BASE_BZXS},
+			BASE_SDJC=#{BASE_SDJC},
+			BASE_XDJC=#{BASE_XDJC},
+			BASE_YSFS=#{BASE_YSFS},
+			BASE_JHXT=#{BASE_JHXT},
+			PART_JSJ=#{PART_JSJ},
+			PART_TJLX=#{PART_TJLX},
+			PART_TJYS=#{PART_TJYS},
+			PART_TJZFX=#{PART_TJZFX},
+			PART_TJBKCZ=#{PART_TJBKCZ},
+			PART_FSDGCZ=#{PART_FSDGCZ},
+			PART_FSDGG=#{PART_FSDGG},
+			PART_FSDYS=#{PART_FSDYS},
+			PART_WQBCZ=#{PART_WQBCZ},
+			PART_NWGBCZ=#{PART_NWGBCZ},
+			PART_SCTBJHDGB=#{PART_SCTBJHDGB},
+			PART_SCB=#{PART_SCB},
+			PART_QDFS=#{PART_QDFS},
+			OPT_ANZDQ=#{OPT_ANZDQ},
+			OPT_JTLXD=#{OPT_JTLXD},
+			OPT_ZDJY=#{OPT_ZDJY},
+			OPT_QDLLZ=#{OPT_QDLLZ},
+			OPT_LEDWQZM=#{OPT_LEDWQZM},
+			OPT_TJFTBH=#{OPT_TJFTBH},
+			OPT_FSDDDBHZZ=#{OPT_FSDDDBHZZ},
+			OPT_ZDWQJXKG=#{OPT_ZDWQJXKG},
+			OPT_SCZM=#{OPT_SCZM},
+			OPT_YSFLQ=#{OPT_YSFLQ},
+			OPT_FHBH=#{OPT_FHBH},
+			OPT_TJLFHZ=#{OPT_TJLFHZ},
+			OPT_WXHLTS=#{OPT_WXHLTS},
+			OPT_FPZZ=#{OPT_FPZZ},
+			OPT_HJFDDS=#{OPT_HJFDDS},
+			OPT_GCD=#{OPT_GCD},
+			OPT_ZDQMSJK=#{OPT_ZDQMSJK},
+			OPT_DZGSS=#{OPT_DZGSS},
+			OPT_HJJR=#{OPT_HJJR},
+			OPT_SCJR=#{OPT_SCJR},
+			OPT_FSJR=#{OPT_FSJR},
+			OPT_WZSWZ=#{OPT_WZSWZ},
+			OPT_ZSBCL=#{OPT_ZSBCL},
+			OPT_ZSBHD=#{OPT_ZSBHD}
+		WHERE
+			DNP9300_ID=#{DNP9300_ID}
+	}
+	</update>
+	
+	
+	<!-- 人行道保存 -->
+	<insert id="saveDnr" parameterType="pd">
+		INSERT INTO TB_DNR(
+			DNR_ID,
+			DNR_AZF,
+			DNR_YSF,
+			DNR_SL,
+			DNR_ZK,
+			DNR_ZHJ,
+			DNR_SBJ,
+			DNR_ZHSBJ,
+			DNR_SJBJ,
+			ELEV_IDS,
+			ITEM_ID,
+			MODELS_ID,
+			BZ_SD,
+			BZ_GG,
+			BZ_TSGD,
+			BZ_TJKD,
+			BZ_TBKD,
+			BZ_QXJD,
+			BZ_SPTJ,
+			BASE_SPKJ,
+			BASE_DY,
+			BASE_AZHJ,
+			BASE_FSLX,
+			BASE_FSGD,
+			BASE_ZJZCSL,
+			BASE_BZXS,
+			BASE_SDJC,
+			BASE_YSFS,
+			BASE_JHXT,
+			PART_JSJ,
+			PART_TJLX,
+			PART_TJYS,
+			PART_FSDGCZ,
+			PART_FSDGG,
+			PART_FSDYS,
+			PART_WQBCZ,
+			PART_NWGBCZ,
+			PART_SCTBJHDGB,
+			PART_SCB,
+			PART_QDFS,
+			PART_BPGNGL,
+			OPT_ANZDQ,
+			OPT_JTLXD,
+			OPT_ZDJY,
+			OPT_WQAQZZ,
+			OPT_FSDDDBHZZ,
+			OPT_ZDWQJXKG,
+			OPT_SCZM,
+			OPT_WXHLTS,
+			OPT_JXSB,
+			OPT_JXXD,
+			OPT_FPZZ,
+			OPT_HJFDDS,
+			OPT_CKXRXD,
+			OPT_SPMS,
+			OPT_YXFXZSD,
+			OPT_GCD,
+			OPT_QDLLZ,
+			OPT_ZDQMSJK,
+			OPT_LEDWQZM,
+			OPT_DLFDLJQ,
+			OPT_DZGSS,
+			OPT_FZDK,
+			OPT_ZJJT,
+			OPT_EWJT,
+			OPT_WZSWZ,
+			OPT_ZSBCL,
+			OPT_ZSBHD
+		)VALUES(
+			#{DNR_ID},
+			#{DNR_AZF},
+			#{DNR_YSF},
+			#{DNR_SL},
+			#{DNR_ZK},
+			#{DNR_ZHJ},
+			#{DNR_SBJ},
+			#{DNR_ZHSBJ},
+			#{DNR_SJBJ},
+			#{ELEV_IDS},
+			#{ITEM_ID},
+			#{MODELS_ID},
+			#{BZ_SD},
+			#{BZ_GG},
+			#{BZ_TSGD},
+			#{BZ_TJKD},
+			#{BZ_TBKD},
+			#{BZ_QXJD},
+			#{BZ_SPTJ},
+			#{BASE_SPKJ},
+			#{BASE_DY},
+			#{BASE_AZHJ},
+			#{BASE_FSLX},
+			#{BASE_FSGD},
+			#{BASE_ZJZCSL},
+			#{BASE_BZXS},
+			#{BASE_SDJC},
+			#{BASE_YSFS},
+			#{BASE_JHXT},
+			#{PART_JSJ},
+			#{PART_TJLX},
+			#{PART_TJYS},
+			#{PART_FSDGCZ},
+			#{PART_FSDGG},
+			#{PART_FSDYS},
+			#{PART_WQBCZ},
+			#{PART_NWGBCZ},
+			#{PART_SCTBJHDGB},
+			#{PART_SCB},
+			#{PART_QDFS},
+			#{PART_BPGNGL},
+			#{OPT_ANZDQ},
+			#{OPT_JTLXD},
+			#{OPT_ZDJY},
+			#{OPT_WQAQZZ},
+			#{OPT_FSDDDBHZZ},
+			#{OPT_ZDWQJXKG},
+			#{OPT_SCZM},
+			#{OPT_WXHLTS},
+			#{OPT_JXSB},
+			#{OPT_JXXD},
+			#{OPT_FPZZ},
+			#{OPT_HJFDDS},
+			#{OPT_CKXRXD},
+			#{OPT_SPMS},
+			#{OPT_YXFXZSD},
+			#{OPT_GCD},
+			#{OPT_QDLLZ},
+			#{OPT_ZDQMSJK},
+			#{OPT_LEDWQZM},
+			#{OPT_DLFDLJQ},
+			#{OPT_DZGSS},
+			#{OPT_FZDK},
+			#{OPT_ZJJT},
+			#{OPT_EWJT},
+			#{OPT_WZSWZ},
+			#{OPT_ZSBCL},
+			#{OPT_ZSBHD}
+		)
+	</insert>
+	
+	<!-- 人行道编辑 -->
+	<update id="updateDnr" parameterType="pd">
+		UPDATE TB_DNR SET
+			DNR_AZF=#{DNR_AZF},
+			DNR_YSF=#{DNR_YSF},
+			DNR_SL=#{DNR_SL},
+			DNR_ZK=#{DNR_ZK},
+			DNR_ZHJ=#{DNR_ZHJ},
+			DNR_SBJ=#{DNR_SBJ},
+			DNR_ZHSBJ=#{DNR_ZHSBJ},
+			DNR_SJBJ=#{DNR_SJBJ},
+			ELEV_IDS=#{ELEV_IDS},
+			ITEM_ID=#{ITEM_ID},
+			MODELS_ID=#{MODELS_ID},
+			BZ_SD=#{BZ_SD},
+			BZ_GG=#{BZ_GG},
+			BZ_TSGD=#{BZ_TSGD},
+			BZ_TJKD=#{BZ_TJKD},
+			BZ_TBKD=#{BZ_TBKD},
+			BZ_QXJD=#{BZ_QXJD},
+			BZ_SPTJ=#{BZ_SPTJ},
+			BASE_SPKJ=#{BASE_SPKJ},
+			BASE_DY=#{BASE_DY},
+			BASE_AZHJ=#{BASE_AZHJ},
+			BASE_FSLX=#{BASE_FSLX},
+			BASE_FSGD=#{BASE_FSGD},
+			BASE_ZJZCSL=#{BASE_ZJZCSL},
+			BASE_BZXS=#{BASE_BZXS},
+			BASE_SDJC=#{BASE_SDJC},
+			BASE_YSFS=#{BASE_YSFS},
+			BASE_JHXT=#{BASE_JHXT},
+			PART_JSJ=#{PART_JSJ},
+			PART_TJLX=#{PART_TJLX},
+			PART_TJYS=#{PART_TJYS},
+			PART_FSDGCZ=#{PART_FSDGCZ},
+			PART_FSDGG=#{PART_FSDGG},
+			PART_FSDYS=#{PART_FSDYS},
+			PART_WQBCZ=#{PART_WQBCZ},
+			PART_NWGBCZ=#{PART_NWGBCZ},
+			PART_SCTBJHDGB=#{PART_SCTBJHDGB},
+			PART_SCB=#{PART_SCB},
+			PART_QDFS=#{PART_QDFS},
+			PART_BPGNGL=#{PART_BPGNGL},
+			OPT_ANZDQ=#{OPT_ANZDQ},
+			OPT_JTLXD=#{OPT_JTLXD},
+			OPT_ZDJY=#{OPT_ZDJY},
+			OPT_WQAQZZ=#{OPT_WQAQZZ},
+			OPT_FSDDDBHZZ=#{OPT_FSDDDBHZZ},
+			OPT_ZDWQJXKG=#{OPT_ZDWQJXKG},
+			OPT_SCZM=#{OPT_SCZM},
+			OPT_WXHLTS=#{OPT_WXHLTS},
+			OPT_JXSB=#{OPT_JXSB},
+			OPT_JXXD=#{OPT_JXXD},
+			OPT_FPZZ=#{OPT_FPZZ},
+			OPT_HJFDDS=#{OPT_HJFDDS},
+			OPT_CKXRXD=#{OPT_CKXRXD},
+			OPT_SPMS=#{OPT_SPMS},
+			OPT_YXFXZSD=#{OPT_YXFXZSD},
+			OPT_GCD=#{OPT_GCD},
+			OPT_QDLLZ=#{OPT_QDLLZ},
+			OPT_ZDQMSJK=#{OPT_ZDQMSJK},
+			OPT_LEDWQZM=#{OPT_LEDWQZM},
+			OPT_DLFDLJQ=#{OPT_DLFDLJQ},
+			OPT_DZGSS=#{OPT_DZGSS},
+			OPT_FZDK=#{OPT_FZDK},
+			OPT_ZJJT=#{OPT_ZJJT},
+			OPT_EWJT=#{OPT_EWJT},
+			OPT_WZSWZ=#{OPT_WZSWZ},
+			OPT_ZSBCL=#{OPT_ZSBCL},
+			OPT_ZSBHD=#{OPT_ZSBHD}
+		WHERE
+			DNR_ID=#{DNR_ID}
+	</update>
+	
+	
+	<!-- 曳引梯保存 -->
+	<insert id="saveShiny" parameterType="pd">
+		INSERT INTO TB_SHINY(
+			SHINY_ID,
+			SHINY_AZF,
+			SHINY_YSF,
+			SHINY_SL,
+			SHINY_ZK,
+			SHINY_ZHJ,
+			SHINY_SBJ,
+			SHINY_ZHSBJ,
+			SHINY_SJBJ,
+			ELEV_IDS,
+			ITEM_ID,
+			MODELS_ID,
+			BZ_ZZ,
+			BZ_SD,
+			BZ_KMXS,
+			BZ_KMKD,
+			BZ_C,
+			BZ_Z,
+			BZ_M,
+			BASE_KZXT,
+			BASE_KZFS,
+			BASE_YYZJ,
+			BASE_QGLJJ,
+			BASE_JXGG,
+			BASE_JXGD,
+			BASE_HTDM,
+			BASE_MJXH,
+			BASE_MBHFS,
+			BASE_JDJG,
+			BASE_JDCZQHD,
+			BASE_JDK,
+			BASE_JDS,
+			BASE_TSGD,
+			BASE_DKSD,
+			BASE_DCGD,
+			BASE_JDZG,
+			BASE_JZZT,
+			BASE_LCBJ,
+			BASE_DGZJ,
+			OPT_JFGT,
+			OPT_COP,
+			OPT_WZYCOPMWAN,
+			OPT_GBSCJRCZXCOP,
+			OPT_LOP,
+			OPT_FDLCZ,
+			OPT_TDJJJY,
+			OPT_YSJCZ,
+			OPT_CCTVDL,
+			OPT_JJBYDYCZZZ,
+			OPT_JXDZZ,
+			OPT_ZPC,
+			OPT_YCJSJKZB,
+			OPT_YYBZ,
+			OPT_HJZDFHJZ,
+			OPT_BAJK,
+			OPT_DJGRBH,
+			OPT_XFLD,
+			OPT_TWXFYFW,
+			DZJKSDJXT_DJTXFS,
+			DZJKSDJXT_TQZDSBH,
+			JXZH_JM,
+			JXZH_JMSBH,
+			JXZH_QWB,
+			JXZH_QWBSBH,
+			JXZH_CWB,
+			JXZH_CWBSBH,
+			JXZH_HWB,
+			JXZH_HWBSBH,
+			JXZH_JDZH,
+			JXZH_JDAQC,
+			JXZH_DBXH,
+			JXZH_DBZXHD,
+			JXZH_FZTXH,
+			JXZH_FZTAZWZ,
+			JXZH_BGJ,
+			TMMT_SCTMMTCZXMK,
+			TMMT_FSCTMMTCZXMK,
+			TMMT_XMKCZS,
+			TMMT_XMKLM,
+			TMMT_SCTMMTCZDMK,
+			TMMT_FSCTMMTCZDMK,
+			TMMT_DMKCZS,
+			TMMT_DMKLM,
+			TMMT_TMCZ,
+			TMMT_FSCTMCZ,
+			TMMT_CZS,
+			TMMT_LM,
+			CZP_CZPLX,
+			CZP_CZPXH,
+			CZP_XS,
+			CZP_AN,
+			CZP_CZ,
+			CZP_CZPWZ,
+			TMXHZZ_TWZHLX,
+			TMXHZZ_TWZHXH,
+			TMXHZZ_SL,
+			TMXHZZ_XS,
+			TMXHZZ_AN,
+			TMXHZZ_CZ,
+			TMXHZZ_TWZHXS,
+			TMXHZZ_ZDJC,
+			TMXHZZ_FJSM,
+			UNSTD
+		)VALUES(
+			#{SHINY_ID},
+			#{SHINY_AZF},
+			#{SHINY_YSF},
+			#{SHINY_SL},
+			#{SHINY_ZK},
+			#{SHINY_ZHJ},
+			#{SHINY_SBJ},
+			#{SHINY_ZHSBJ},
+			#{SHINY_SJBJ},
+			#{ELEV_IDS},
+			#{ITEM_ID},
+			#{MODELS_ID},
+			#{BZ_ZZ},
+			#{BZ_SD},
+			#{BZ_KMXS},
+			#{BZ_KMKD},
+			#{BZ_C},
+			#{BZ_Z},
+			#{BZ_M},
+			#{BASE_KZXT},
+			#{BASE_KZFS},
+			#{BASE_YYZJ},
+			#{BASE_QGLJJ},
+			#{BASE_JXGG},
+			#{BASE_JXGD},
+			#{BASE_HTDM},
+			#{BASE_MJXH},
+			#{BASE_MBHFS},
+			#{BASE_JDJG},
+			#{BASE_JDCZQHD},
+			#{BASE_JDK},
+			#{BASE_JDS},
+			#{BASE_TSGD},
+			#{BASE_DKSD},
+			#{BASE_DCGD},
+			#{BASE_JDZG},
+			#{BASE_JZZT},
+			#{BASE_LCBJ},
+			#{BASE_DGZJ},
+			#{OPT_JFGT},
+			#{OPT_COP},
+			#{OPT_WZYCOPMWAN},
+			#{OPT_GBSCJRCZXCOP},
+			#{OPT_LOP},
+			#{OPT_FDLCZ},
+			#{OPT_TDJJJY},
+			#{OPT_YSJCZ},
+			#{OPT_CCTVDL},
+			#{OPT_JJBYDYCZZZ},
+			#{OPT_JXDZZ},
+			#{OPT_ZPC},
+			#{OPT_YCJSJKZB},
+			#{OPT_YYBZ},
+			#{OPT_HJZDFHJZ},
+			#{OPT_BAJK},
+			#{OPT_DJGRBH},
+			#{OPT_XFLD},
+			#{OPT_TWXFYFW},
+			#{DZJKSDJXT_DJTXFS},
+			#{DZJKSDJXT_TQZDSBH},
+			#{JXZH_JM},
+			#{JXZH_JMSBH},
+			#{JXZH_QWB},
+			#{JXZH_QWBSBH},
+			#{JXZH_CWB},
+			#{JXZH_CWBSBH},
+			#{JXZH_HWB},
+			#{JXZH_HWBSBH},
+			#{JXZH_JDZH},
+			#{JXZH_JDAQC},
+			#{JXZH_DBXH},
+			#{JXZH_DBZXHD},
+			#{JXZH_FZTXH},
+			#{JXZH_FZTAZWZ},
+			#{JXZH_BGJ},
+			#{TMMT_SCTMMTCZXMK},
+			#{TMMT_FSCTMMTCZXMK},
+			#{TMMT_XMKCZS},
+			#{TMMT_XMKLM},
+			#{TMMT_SCTMMTCZDMK},
+			#{TMMT_FSCTMMTCZDMK},
+			#{TMMT_DMKCZS},
+			#{TMMT_DMKLM},
+			#{TMMT_TMCZ},
+			#{TMMT_FSCTMCZ},
+			#{TMMT_CZS},
+			#{TMMT_LM},
+			#{CZP_CZPLX},
+			#{CZP_CZPXH},
+			#{CZP_XS},
+			#{CZP_AN},
+			#{CZP_CZ},
+			#{CZP_CZPWZ},
+			#{TMXHZZ_TWZHLX},
+			#{TMXHZZ_TWZHXH},
+			#{TMXHZZ_SL},
+			#{TMXHZZ_XS},
+			#{TMXHZZ_AN},
+			#{TMXHZZ_CZ},
+			#{TMXHZZ_TWZHXS},
+			#{TMXHZZ_ZDJC},
+			#{TMXHZZ_FJSM},
+			#{UNSTD}
+		)
+	</insert>
+	
+	<!-- 曳引编辑 -->
+	<update id="updateShiny" parameterType="pd">
+		UPDATE TB_SHINY SET
+			SHINY_AZF=#{SHINY_AZF},
+			SHINY_YSF=#{SHINY_YSF},
+			SHINY_SL=#{SHINY_SL},
+			SHINY_ZK=#{SHINY_ZK},
+			SHINY_ZHJ=#{SHINY_ZHJ},
+			SHINY_SBJ=#{SHINY_SBJ},
+			SHINY_ZHSBJ=#{SHINY_ZHSBJ},
+			SHINY_SJBJ=#{SHINY_SJBJ},
+			ELEV_IDS=#{ELEV_IDS},
+			ITEM_ID=#{ITEM_ID},
+			MODELS_ID=#{MODELS_ID},
+			BZ_ZZ=#{BZ_ZZ},
+			BZ_SD=#{BZ_SD},
+			BZ_KMXS=#{BZ_KMXS},
+			BZ_KMKD=#{BZ_KMKD},
+			BZ_C=#{BZ_C},
+			BZ_Z=#{BZ_Z},
+			BZ_M=#{BZ_M},
+			BASE_KZXT=#{BASE_KZXT},
+			BASE_KZFS=#{BASE_KZFS},
+			BASE_YYZJ=#{BASE_YYZJ},
+			BASE_QGLJJ=#{BASE_QGLJJ},
+			BASE_JXGG=#{BASE_JXGG},
+			BASE_JXGD=#{BASE_JXGD},
+			BASE_HTDM=#{BASE_HTDM},
+			BASE_MJXH=#{BASE_MJXH},
+			BASE_MBHFS=#{BASE_MBHFS},
+			BASE_JDJG=#{BASE_JDJG},
+			BASE_JDCZQHD=#{BASE_JDCZQHD},
+			BASE_JDK=#{BASE_JDK},
+			BASE_JDS=#{BASE_JDS},
+			BASE_TSGD=#{BASE_TSGD},
+			BASE_DKSD=#{BASE_DKSD},
+			BASE_DCGD=#{BASE_DCGD},
+			BASE_JDZG=#{BASE_JDZG},
+			BASE_JZZT=#{BASE_JZZT},
+			BASE_LCBJ=#{BASE_LCBJ},
+			BASE_DGZJ=#{BASE_DGZJ},
+			OPT_JFGT=#{OPT_JFGT},
+			OPT_COP=#{OPT_COP},
+			OPT_WZYCOPMWAN=#{OPT_WZYCOPMWAN},
+			OPT_GBSCJRCZXCOP=#{OPT_GBSCJRCZXCOP},
+			OPT_LOP=#{OPT_LOP},
+			OPT_FDLCZ=#{OPT_FDLCZ},
+			OPT_TDJJJY=#{OPT_TDJJJY},
+			OPT_YSJCZ=#{OPT_YSJCZ},
+			OPT_CCTVDL=#{OPT_CCTVDL},
+			OPT_JJBYDYCZZZ=#{OPT_JJBYDYCZZZ},
+			OPT_JXDZZ=#{OPT_JXDZZ},
+			OPT_ZPC=#{OPT_ZPC},
+			OPT_YCJSJKZB=#{OPT_YCJSJKZB},
+			OPT_YYBZ=#{OPT_YYBZ},
+			OPT_HJZDFHJZ=#{OPT_HJZDFHJZ},
+			OPT_BAJK=#{OPT_BAJK},
+			OPT_DJGRBH=#{OPT_DJGRBH},
+			OPT_XFLD=#{OPT_XFLD},
+			OPT_TWXFYFW=#{OPT_TWXFYFW},
+			DZJKSDJXT_DJTXFS=#{DZJKSDJXT_DJTXFS},
+			DZJKSDJXT_TQZDSBH=#{DZJKSDJXT_TQZDSBH},
+			JXZH_JM=#{JXZH_JM},
+			JXZH_JMSBH=#{JXZH_JMSBH},
+			JXZH_QWB=#{JXZH_QWB},
+			JXZH_QWBSBH=#{JXZH_QWBSBH},
+			JXZH_CWB=#{JXZH_CWB},
+			JXZH_CWBSBH=#{JXZH_CWBSBH},
+			JXZH_HWB=#{JXZH_HWB},
+			JXZH_HWBSBH=#{JXZH_HWBSBH},
+			JXZH_JDZH=#{JXZH_JDZH},
+			JXZH_JDAQC=#{JXZH_JDAQC},
+			JXZH_DBXH=#{JXZH_DBXH},
+			JXZH_DBXH=#{JXZH_DBZXHD},
+			JXZH_FZTXH=#{JXZH_FZTXH},
+			JXZH_FZTAZWZ=#{JXZH_FZTAZWZ},
+			JXZH_BGJ=#{JXZH_BGJ},
+			TMMT_SCTMMTCZXMK=#{TMMT_SCTMMTCZXMK},
+			TMMT_FSCTMMTCZXMK=#{TMMT_FSCTMMTCZXMK},
+			TMMT_XMKCZS=#{TMMT_XMKCZS},
+			TMMT_XMKLM=#{TMMT_XMKLM},
+			TMMT_SCTMMTCZDMK=#{TMMT_SCTMMTCZDMK},
+			TMMT_FSCTMMTCZDMK=#{TMMT_FSCTMMTCZDMK},
+			TMMT_DMKCZS=#{TMMT_DMKCZS},
+			TMMT_DMKLM=#{TMMT_DMKLM},
+			TMMT_TMCZ=#{TMMT_TMCZ},
+			TMMT_FSCTMCZ=#{TMMT_FSCTMCZ},
+			TMMT_CZS=#{TMMT_CZS},
+			TMMT_LM=#{TMMT_LM},
+			CZP_CZPLX=#{CZP_CZPLX},
+			CZP_CZPXH=#{CZP_CZPXH},
+			CZP_XS=#{CZP_XS},
+			CZP_AN=#{CZP_AN},
+			CZP_CZ=#{CZP_CZ},
+			CZP_CZPWZ=#{CZP_CZPWZ},
+			TMXHZZ_TWZHLX=#{TMXHZZ_TWZHLX},
+			TMXHZZ_TWZHXH=#{TMXHZZ_TWZHXH},
+			TMXHZZ_SL=#{TMXHZZ_SL},
+			TMXHZZ_XS=#{TMXHZZ_XS},
+			TMXHZZ_AN=#{TMXHZZ_AN},
+			TMXHZZ_CZ=#{TMXHZZ_CZ},
+			TMXHZZ_TWZHXS=#{TMXHZZ_TWZHXS},
+			TMXHZZ_ZDJC=#{TMXHZZ_ZDJC},
+			TMXHZZ_FJSM=#{TMXHZZ_FJSM},
+			UNSTD=#{UNSTD}
+		WHERE
+			SHINY_ID=#{SHINY_ID}
+	</update>
+	
+	
+	<select id="findBjc" parameterType="pd" resultType="pd">
+		SELECT A.* FROM(
+		SELECT ITEM_ID,'曳引货梯' AS MODELS_,SHINY_ID AS ID_,SHINY_AZF AS AZF_,SHINY_YSF AS YSF_,SHINY_SL AS SL_,SHINY_ZK AS ZK_,
+		SHINY_ZHJ AS ZHJ_,SHINY_SBJ AS SBJ_,SHINY_ZHSBJ AS ZHSBJ_,SHINY_SJBJ AS SJBJ_,CONCAT(BZ_C,'/',BZ_Z,'/',BZ_M) AS CZM_ FROM TB_SHINY
+		UNION
+		SELECT ITEM_ID,'飞尚GL freight' AS MODELS_,FEISHANG_ID AS ID_,FEISHANG_AZF AS AZF_,FEISHANG_YSF AS YSF_,FEISHANG_SL AS SL_,FEISHANG_ZK AS ZK_,
+		FEISHANG_ZHJ AS ZHJ_,FEISHANG_SBJ AS SBJ_,FEISHANG_ZHSBJ AS ZHSBJ_,FEISHANG_SJBJ AS SJBJ_,CONCAT(BZ_C,'/',BZ_Z,'/',BZ_M) AS CZM_ FROM TB_FEISHANG
+		UNION
+		SELECT ITEM_ID,'飞扬3000+' AS MODELS_,FEIYANG_ID AS ID_,FEIYANG_AZF AS AZF_,FEIYANG_YSF AS YSF_,FEIYANG_SL AS SL_,FEIYANG_ZK AS ZK_,
+		FEIYANG_ZHJ AS ZHJ_,FEIYANG_SBJ AS SBJ_,FEIYANG_ZHSBJ AS ZHSBJ_,FEIYANG_SJBJ AS SJBJ_,CONCAT(BZ_C,'/',BZ_Z,'/',BZ_M) AS CZM_ FROM TB_FEIYANG
+		UNION
+		SELECT ITEM_ID,'飞扬3000+MRL' AS MODELS_,FEIYANGMRL_ID AS ID_,FEIYANGMRL_AZF AS AZF_,FEIYANGMRL_YSF AS YSF_,FEIYANGMRL_SL AS SL_,FEIYANGMRL_ZK AS ZK_,
+		FEIYANGMRL_ZHJ AS ZHJ_,FEIYANGMRL_SBJ AS SBJ_,FEIYANGMRL_ZHSBJ AS ZHSBJ_,FEIYANGMRL_SJBJ AS SJBJ_,CONCAT(BZ_C,'/',BZ_Z,'/',BZ_M) AS CZM_ FROM TB_FEIYANG_MRL
+		UNION
+		SELECT ITEM_ID,'飞扬消防梯' AS MODELS_,FEIYANGXF_ID AS ID_,FEIYANGXF_AZF AS AZF_,FEIYANGXF_YSF AS YSF_,FEIYANGXF_SL AS SL_,FEIYANGXF_ZK AS ZK_,
+		FEIYANGXF_ZHJ AS ZHJ_,FEIYANGXF_SBJ AS SBJ_,FEIYANGXF_ZHSBJ AS ZHSBJ_,FEIYANGXF_SJBJ AS SJBJ_,CONCAT(BZ_C,'/',BZ_Z,'/',BZ_M) AS CZM_ FROM TB_FEIYANG_XF
+		UNION
+		SELECT ITEM_ID,'新飞越' AS MODELS_,FEIYUE_ID AS ID_,FEIYUE_AZF AS AZF_,FEIYUE_YSF AS YSF_,FEIYUE_SL AS SL_,FEIYUE_ZK AS ZK_,
+		FEIYUE_ZHJ AS ZHJ_,FEIYUE_SBJ AS SBJ_,FEIYUE_ZHSBJ AS ZHSBJ_,FEIYUE_SJBJ AS SJBJ_,CONCAT(BZ_C,'/',BZ_Z,'/',BZ_M) AS CZM_ FROM TB_FEIYUE
+		UNION
+		SELECT ITEM_ID,'新飞越MRL' AS MODELS_,FEIYUEMRL_ID AS ID_,FEIYUEMRL_AZF AS AZF_,FEIYUEMRL_YSF AS YSF_,FEIYUEMRL_SL AS SL_,FEIYUEMRL_ZK AS ZK_,
+		FEIYUEMRL_ZHJ AS ZHJ_,FEIYUEMRL_SBJ AS SBJ_,FEIYUEMRL_ZHSBJ AS ZHSBJ_,FEIYUEMRL_SJBJ AS SJBJ_,CONCAT(BZ_C,'/',BZ_Z,'/',BZ_M) AS CZM_ FROM TB_FEIYUE_MRL
+		UNION
+		SELECT ITEM_ID,'DNP9300' AS MODELS_,DNP9300_ID AS ID_,DNP9300_AZF AS AZF_,DNP9300_YSF AS YSF_,DNP9300_SL AS SL_,DNP9300_ZK AS SL_,
+		DNP9300_ZHJ AS ZHJ_,DNP9300_SBJ AS SBJ_,DNP9300_ZHSBJ AS ZHSBJ_,DNP9300_SJBJ AS SJBJ_,'--/--/--' AS CZM_ FROM TB_DNP9300
+		UNION
+		SELECT ITEM_ID,'DNR' AS MODELS_,DNR_ID AS ID_,DNR_AZF AS AZF_,DNR_YSF AS YSF_,DNR_SL AS SL_,DNR_ZK AS ZK_,
+		DNR_ZHJ AS ZHJ_,DNR_SBJ AS SBJ_,DNR_ZHSBJ ZHSBJ_,DNR_SJBJ AS SJBJ_,'--/--/--' AS CZM_ FROM TB_DNR
+		)A WHERE A.ITEM_ID=#{ITEM_ID}
+	</select>
+	
+	<!-- 根据ITEM_ID获取报价池内的折扣和梯型 -->
+	<select id="findBjcByItemId" parameterType="pd" resultType="pd">
+		SELECT
+		  tb_bjc.BJC_ZK,
+		  tb_models.elevator_id
+		FROM
+		  tb_bjc
+		LEFT JOIN
+		  tb_models
+		ON
+		  tb_bjc.BJC_MODELS=tb_models.models_id
+		WHERE
+			BJC_ITEM_ID=#{item_id}
+	</select> 
+	
+	<!-- 查询feishang参考报价信息列表 -->
+	<select id="findFeishangCbj" resultType="pd">
+		select c.*,d.ITEM_NAME,e.MODELS_NAME from(
+		select a.* from tb_bjc a,tb_feishang b where a.bjc_cod_id=b.feishang_id
+		)c
+		left join tb_item d on c.bjc_item_id=d.item_id
+		left join tb_models e on c.bjc_models=e.models_id
+		left join tb_feishang f on c.bjc_cod_id=f.feishang_id
+	</select>
+	<!-- 查询feishang参考报价信息列表 -->
+	<select id="findFeiyangCbj" resultType="pd">
+		select c.*,d.ITEM_NAME,e.MODELS_NAME from(
+		select a.* from tb_bjc a,tb_feiyang b where a.bjc_cod_id=b.feiyang_id
+		)c
+		left join tb_item d on c.bjc_item_id=d.item_id
+		left join tb_models e on c.bjc_models=e.models_id
+		left join tb_feiyang f on c.bjc_cod_id=f.feiyang_id
+	</select>
+	<!-- 查询feishang参考报价信息列表 -->
+	<select id="findFeiyangMRLCbj" resultType="pd">
+		select c.*,d.ITEM_NAME,e.MODELS_NAME from(
+		select a.* from tb_bjc a,tb_feiyang_mrl b where a.bjc_cod_id=b.feiyangmrl_id
+		)c
+		left join tb_item d on c.bjc_item_id=d.item_id
+		left join tb_models e on c.bjc_models=e.models_id
+		left join tb_feiyang_mrl f on c.bjc_cod_id=f.feiyangmrl_id
+	</select>
+	<!-- 查询feishang参考报价信息列表 -->
+	<select id="findFeiyangXFCbj" resultType="pd">
+		select c.*,d.ITEM_NAME,e.MODELS_NAME from(
+		select a.* from tb_bjc a,tb_feiyang_xf b where a.bjc_cod_id=b.feiyangxf_id
+		)c
+		left join tb_item d on c.bjc_item_id=d.item_id
+		left join tb_models e on c.bjc_models=e.models_id
+		left join tb_feiyang_xf f on c.bjc_cod_id=f.feiyangxf_id
+	</select>
+	<!-- 查询feiyue参考报价信息列表 -->
+	<select id="findFeiyueCbj" resultType="pd">
+		select c.*,d.ITEM_NAME,e.MODELS_NAME from(
+		select a.* from tb_bjc a,tb_feiyue b where a.bjc_cod_id=b.feiyue_id
+		)c
+		left join tb_item d on c.bjc_item_id=d.item_id
+		left join tb_models e on c.bjc_models=e.models_id
+		left join tb_feiyue f on c.bjc_cod_id=f.feiyue_id
+	</select>
+	<!-- 查询feiyue参考报价信息列表 -->
+	<select id="findFeiyueMRLCbj" resultType="pd">
+		select c.*,d.ITEM_NAME,e.MODELS_NAME from(
+		select a.* from tb_bjc a,tb_feiyue_mrl b where a.bjc_cod_id=b.feiyuemrl_id
+		)c
+		left join tb_item d on c.bjc_item_id=d.item_id
+		left join tb_models e on c.bjc_models=e.models_id
+		left join tb_feiyue_mrl f on c.bjc_cod_id=f.feiyuemrl_id
+	</select>
+	<!-- 查询shiny参考报价信息列表 -->
+	<select id="findShinyCbj" resultType="pd">
+		select c.*,d.ITEM_NAME,e.MODELS_NAME from(
+		select a.* from tb_bjc a,tb_shiny b where a.bjc_cod_id=b.shiny_id
+		)c
+		left join tb_item d on c.bjc_item_id=d.item_id
+		left join tb_models e on c.bjc_models=e.models_id
+		left join tb_shiny f on c.bjc_cod_id=f.shiny_id
+	</select>
+	<!-- 查询dnp9300参考报价信息列表 -->
+	<select id="findDnp9300Cbj" resultType="pd">
+		select c.*,d.ITEM_NAME,e.MODELS_NAME from(
+		select a.* from tb_bjc a,tb_dnp9300 b where a.bjc_cod_id=b.dnp9300_id
+		)c
+		left join tb_item d on c.bjc_item_id=d.item_id
+		left join tb_models e on c.bjc_models=e.models_id
+		left join tb_dnp9300 f on c.bjc_cod_id=f.dnp9300_id
+	</select>
+	<!-- 查询dnr参考报价信息列表 -->
+	<select id="findDnrCbj" resultType="pd">
+		select c.*,d.ITEM_NAME,e.MODELS_NAME from(
+		select a.* from tb_bjc a,tb_dnr b where a.bjc_cod_id=b.dnr_id
+		)c
+		left join tb_item d on c.bjc_item_id=d.item_id
+		left join tb_models e on c.bjc_models=e.models_id
+		left join tb_dnr f on c.bjc_cod_id=f.dnr_id
+	</select>
+	
+	
+	
+	
+	
+	
+	
+	<!-- 查询feishang参考报价信息列表 -->
+	<select id="findFeishangZhj" resultType="pd">
+		SELECT BASE_JXGG AS JXGG,BASE_JXGD AS JXGD,FEISHANG_SL AS SL,FEISHANG_SJBJ AS SJBJ,FEISHANG_ID AS ID FROM TB_FEISHANG
+	</select>
+	<!-- 查询feiyang参考报价信息列表 -->
+	<select id="findFeiyangZhj" resultType="pd">
+		SELECT BASE_JXGG AS JXGG,BASE_JXGD AS JXGD,FEIYANG_SL AS SL,FEIYANG_SJBJ AS SJBJ,FEIYANG_ID AS ID FROM TB_FEIYANG
+	</select>
+	<!-- 查询feiyangMRL参考报价信息列表 -->
+	<select id="findFeiyangMRLZhj" resultType="pd">
+		SELECT BASE_JXGG AS JXGG,BASE_JXGD AS JXGD,FEIYANGMRL_SL AS SL,FEIYANGMRL_SJBJ AS SJBJ,FEIYANGMRL_ID AS ID FROM TB_FEIYANG_MRL
+	</select>
+	<!-- 查询feiyangXF参考报价信息列表 -->
+	<select id="findFeiyangXFZhj" resultType="pd">
+		SELECT BASE_JXGG AS JXGG,BASE_JXGD AS JXGD,FEIYANGXF_SL AS SL,FEIYANGXF_SJBJ AS SJBJ,FEIYANGXF_ID AS ID FROM TB_FEIYANG_XF
+	</select>
+	<!-- 查询feiyue参考报价信息列表 -->
+	<select id="findFeiyueZhj" resultType="pd">
+		SELECT BASE_JXGG AS JXGG,BASE_JXGD AS JXGD,FEIYUE_SL AS SL,FEIYUE_SJBJ AS SJBJ,FEIYUE_ID AS ID FROM TB_FEIYUE
+	</select>
+	<!-- 查询feiyue参考报价信息列表 -->
+	<select id="findFeiyueMRLZhj" resultType="pd">
+		SELECT BASE_JXGG AS JXGG,BASE_JXGD AS JXGD,FEIYUEMRL_SL AS SL,FEIYUEMRL_SJBJ AS SJBJ,FEIYUEMRL_ID AS ID FROM TB_FEIYUE_MRL
+	</select>
+	<!-- 查询feiyue参考报价信息列表 -->
+	<select id="findShinyZhj" resultType="pd">
+		SELECT BASE_JXGG AS JXGG,BASE_JXGD AS JXGD,SHINY_SL AS SL,SHINY_SJBJ AS SJBJ,SHINY_ID AS ID FROM TB_SHINY
+	</select>
+	<!-- 查询dnp9300参考报价信息列表 -->
+	<select id="findDnp9300Zhj" resultType="pd">
+		<!-- SELECT BASE_JXGG AS JXGG,BASE_JXGD AS JXGD,SHINY_SL AS SL,SHINY_SJBJ AS SJBJ,SHINY_ID AS ID FROM TB_SHINY -->
+	</select>
+	<!-- 查询dnr参考报价信息列表 -->
+	<select id="findDnrZhj" resultType="pd">
+		<!-- SELECT BASE_JXGG AS JXGG,BASE_JXGD AS JXGD,SHINY_SL AS SL,SHINY_SJBJ AS SJBJ,SHINY_ID AS ID FROM TB_SHINY -->
+	</select>
+	
+	
+	
+	
+	
+	
+	
+	
+	<!-- 根据报价池ID获取飞尚COD数据 -->
+	<select id="findFeishangCOD" parameterType="pd" resultType="pd">
+		select * from tb_feishang where feishang_id =(
+			select bjc_cod_id from tb_bjc where bjc_id=#{BJC_ID}
+		)
+	</select>
+	<!-- 根据报价池ID获取飞扬COD数据 -->
+	<select id="findFeiyangCOD" parameterType="pd" resultType="pd">
+		select * from tb_feiyang where feiyang_id =(
+			select bjc_cod_id from tb_bjc where bjc_id=#{BJC_ID}
+		)
+	</select>
+	<!-- 根据报价池ID获取飞扬无机房COD数据 -->
+	<select id="findFeiyangMRLCOD" parameterType="pd" resultType="pd">
+		select * from tb_feiyang_mrl where feiyangmrl_id =(
+			select bjc_cod_id from tb_bjc where bjc_id=#{BJC_ID}
+		)
+	</select>
+	<!-- 根据报价池ID获取飞扬无机房COD数据 -->
+	<select id="findFeiyangXFCOD" parameterType="pd" resultType="pd">
+		select * from tb_feiyang_xf where feiyangxf_id =(
+			select bjc_cod_id from tb_bjc where bjc_id=#{BJC_ID}
+		)
+	</select>
+	<!-- 根据报价池ID获取飞越COD数据 -->
+	<select id="findFeiyueCOD" parameterType="pd" resultType="pd">
+		select * from tb_feiyue where feiyue_id =(
+			select bjc_cod_id from tb_bjc where bjc_id=#{BJC_ID}
+		)
+	</select>
+	<!-- 根据报价池ID获取飞越COD数据 -->
+	<select id="findFeiyueMRLCOD" parameterType="pd" resultType="pd">
+		select * from tb_feiyue_mrl where feiyuemrl_id =(
+			select bjc_cod_id from tb_bjc where bjc_id=#{BJC_ID}
+		)
+	</select>
+	<!-- 根据报价池ID获取飞越COD数据 -->
+	<select id="findShinyCOD" parameterType="pd" resultType="pd">
+		select * from tb_shiny where shiny_id =(
+			select bjc_cod_id from tb_bjc where bjc_id=#{BJC_ID}
+		)
+	</select>
+	<!-- 根据报价池ID获取DNP9300 COD数据 -->
+	<select id="findDnp9300COD" parameterType="pd" resultType="pd">
+		select * from tb_dnp9300 where dnp9300_id =(
+			select bjc_cod_id from tb_bjc where bjc_id=#{BJC_ID}
+		)
+	</select>
+	<!-- 根据报价池ID获取DNR COD数据 -->
+	<select id="findDnrCOD" parameterType="pd" resultType="pd">
+		select * from tb_dnr where dnr_id =(
+			select bjc_cod_id from tb_bjc where bjc_id=#{BJC_ID}
+		)
+	</select>
+	
+	
+	
+	
+	
+	
+	
+	
+	<!-- 根据主键获取COD数据 -->
+	<select id="findFeishang" parameterType="pd" resultType="pd">
+		select * from tb_feishang where feishang_id=#{FEISHANG_ID}
+	</select>
+	<!-- 根据主键获取COD数据 -->
+	<select id="findFeiyang" parameterType="pd" resultType="pd">
+		select * from tb_feiyang where feiyang_id=#{FEIYANG_ID}
+	</select>
+	<!-- 根据主键获取COD数据 -->
+	<select id="findFeiyangMRL" parameterType="pd" resultType="pd">
+		select * from tb_feiyang_mrl where feiyangmrl_id=#{FEIYANGMRL_ID}
+	</select>
+	<!-- 根据主键获取COD数据 -->
+	<select id="findFeiyangXF" parameterType="pd" resultType="pd">
+		select * from tb_feiyang_xf where feiyangxf_id=#{FEIYANGXF_ID}
+	</select>
+	<!-- 根据主键获取COD数据 -->
+	<select id="findFeiyue" parameterType="pd" resultType="pd">
+		select * from tb_feiyue where feiyue_id=#{FEIYUE_ID}
+	</select>
+	<!-- 根据主键获取COD数据 -->
+	<select id="findFeiyueMRL" parameterType="pd" resultType="pd">
+		select * from tb_feiyue_mrl where feiyuemrl_id=#{FEIYUEMRL_ID}
+	</select>
+	<!-- 根据主键获取COD数据 -->
+	<select id="findShiny" parameterType="pd" resultType="pd">
+		select * from tb_shiny where shiny_id=#{SHINY_ID}
+	</select>
+	<!-- 根据主键获取COD数据 -->
+	<select id="findDnp9300" parameterType="pd" resultType="pd">
+		select * from tb_dnp9300 where dnp9300_id=#{DNP9300_ID}
+	</select>
+	<!-- 根据主键获取COD数据 -->
+	<select id="findDnr" parameterType="pd" resultType="pd">
+		select * from tb_dnr where dnr_id=#{DNR_ID}
+	</select>
+	
+	
+	
+	
+	<!-- 根据报价池ID获取型号数据 -->
+	<select id="findModels" parameterType="pd" resultType="pd">
+		select * from tb_models where models_id =(
+			select bjc_models from tb_bjc where bjc_id=#{BJC_ID}
+		)
+	</select>
+	
+	<!-- 根据电梯主键修改报价状态 -->
+	<update id="updateDetails" parameterType="pd">
+		update tb_elevator_details set flag=2 where id in
+		<foreach collection="list"  item="id" index="index" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+	</update>
+	
+	<!-- 报价池编辑 -->
+	<update id="updateBjc" parameterType="pd">
+		UPDATE TB_BJC SET
+			BJC_ZHJ=#{BJC_ZHJ},
+			BJC_SBJ=#{BJC_SBJ},
+			BJC_ZK=#{BJC_ZK},
+			BJC_ZHSBJ=#{BJC_ZHSBJ},
+			BJC_AZF=#{BJC_AZF},
+			BJC_YSF=#{BJC_YSF},
+			BJC_SJBJ=#{BJC_SJBJ},
+			BJC_SL=#{BJC_SL},
+			BJC_ZZ=#{BJC_ZZ},
+			BJC_SD=#{BJC_SD},
+			BJC_C=#{BJC_C},
+			BJC_Z=#{BJC_Z},
+			BJC_M=#{BJC_M},
+			BJC_TSGD=#{BJC_TSGD},
+			BJC_COD_ID=#{BJC_COD_ID},
+			BJC_ITEM_ID=#{BJC_ITEM_ID},
+			BJC_ELEV=#{BJC_ELEV},
+			BJC_MODELS=#{BJC_MODELS}	
+		WHERE
+			BJC_ID=#{BJC_ID}
+	</update>
+	
+	
+	<!-- 删除报价池信息 -->
+	<delete id="deleteBjc" parameterType="pd">
+		DELETE FROM TB_BJC WHERE BJC_ID=#{BJC_ID}
+	</delete>
+	<!-- 初始化电梯表状态 -->
+	<update id="initDetails" parameterType="pd">
+		update tb_elevator_details set flag=1 where id in
+		<foreach collection="list"  item="id" index="index" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+	</update>
+	<!-- 根据报价池ID删除飞尚 -->
+	<delete id="deleteFeishangByBjc" parameterType="pd">
+		DELETE FROM TB_FEISHANG WHERE FEISHANG_ID=(
+			SELECT BJC_COD_ID FROM TB_BJC WHERE BJC_ID=#{BJC_ID}
+		)
+	</delete>
+	<!-- 根据报价池ID删除feiyang -->
+	<delete id="deleteFeiyangByBjc" parameterType="pd">
+		DELETE FROM TB_FEIYANG WHERE FEIYANG_ID=(
+			SELECT BJC_COD_ID FROM TB_BJC WHERE BJC_ID=#{BJC_ID}
+		)
+	</delete>
+	<!-- 根据报价池ID删除FEIYANGMRL -->
+	<delete id="deleteFeiyangMRLByBjc" parameterType="pd">
+		DELETE FROM TB_FEIYANG_MRL WHERE FEIYANGMRL_ID=(
+			SELECT BJC_COD_ID FROM TB_BJC WHERE BJC_ID=#{BJC_ID}
+		)
+	</delete>
+	<!-- 根据报价池ID删除FEIYANGXF -->
+	<delete id="deleteFeiyangXFByBjc" parameterType="pd">
+		DELETE FROM TB_FEIYANG_XF WHERE FEIYANGXF_ID=(
+			SELECT BJC_COD_ID FROM TB_BJC WHERE BJC_ID=#{BJC_ID}
+		)
+	</delete>
+	<!-- 根据报价池ID删除FEIYUE -->
+	<delete id="deleteFeiyueByBjc" parameterType="pd">
+		DELETE FROM TB_FEIYUE WHERE FEIYUE_ID=(
+			SELECT BJC_COD_ID FROM TB_BJC WHERE BJC_ID=#{BJC_ID}
+		)
+	</delete>
+	<!-- 根据报价池ID删除FEIYUEMRL -->
+	<delete id="deleteFeiyueMRLByBjc" parameterType="pd">
+		DELETE FROM TB_FEIYUE_MRL WHERE FEIYUEMRL_ID=(
+			SELECT BJC_COD_ID FROM TB_BJC WHERE BJC_ID=#{BJC_ID}
+		)
+	</delete>
+	<!-- 根据报价池ID删除DNP9300 -->
+	<delete id="deleteDnp9300ByBjc" parameterType="pd">
+		DELETE FROM TB_DNP9300 WHERE DNP9300_ID=(
+			SELECT BJC_COD_ID FROM TB_BJC WHERE BJC_ID=#{BJC_ID}
+		)
+	</delete>
+	<!-- 根据报价池ID删除DNR -->
+	<delete id="deleteDnrByBjc" parameterType="pd">
+		DELETE FROM TB_DNR WHERE DNR_ID=(
+			SELECT BJC_COD_ID FROM TB_BJC WHERE BJC_ID=#{BJC_ID}
+		)
+	</delete>
+	<!-- 根据报价池ID删除SHINY -->
+	<delete id="deleteShinyByBjc" parameterType="pd">
+		DELETE FROM TB_SHINY WHERE SHINY_ID=(
+			SELECT BJC_COD_ID FROM TB_BJC WHERE BJC_ID=#{BJC_ID}
+		)
+	</delete>
+	
+	<!-- 根据主键获取报价池信息 -->
+	<select id="selectBjc" parameterType="pd" resultType="pd">
+		select * from tb_bjc where bjc_id=#{BJC_ID}
+	</select>
+
+</mapper>
